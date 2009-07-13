@@ -8,15 +8,15 @@ import Data.Char (isDigit)
 import Data.Maybe (isJust)
 import Text.ParserCombinators.Poly.Plain
 
-import Haschoo.ScmType (ScmType(..))
+import Haschoo.ScmValue (ScmValue(..))
 
-parser :: Parser Char [ScmType]
+parser :: Parser Char [ScmValue]
 parser = do
    ds <- many value
    eof
    return ds
 
-value :: Parser Char ScmType
+value :: Parser Char ScmValue
 value = do
    atmosphere
    quoted <- optional (one '\'' >> commit atmosphere)
@@ -25,7 +25,7 @@ value = do
               then ScmQuoted dat
               else dat
 
-ident :: Parser Char ScmType
+ident :: Parser Char ScmValue
 ident = do
    x <- oneOf [peculiar,ordinary]
    delimiter
@@ -39,17 +39,17 @@ ident = do
     where
       initial = ['a'..'z'] ++ "!$%&*/:<=>?^_~"
 
-bool :: Parser Char ScmType
+bool :: Parser Char ScmValue
 bool = one '#' >> ScmBool . (=='t') <$> (pElem "tf")
 
 -- FIXME: only does base 10 integers
-number :: Parser Char ScmType
+number :: Parser Char ScmValue
 number = do
    x  <- satisfy isDigit
    xs <- commit $ manyFinally (satisfy isDigit) delimiter
    return . ScmInt $ read (x:xs)
 
-character :: Parser Char ScmType
+character :: Parser Char ScmValue
 character = do
    string "#\\"
    c <- oneOf [named, (ScmChar) <$> next]
@@ -59,13 +59,13 @@ character = do
    named = oneOf [ string "space"   >> return (ScmChar ' ')
                  , string "newline" >> return (ScmChar '\n') ]
 
-quotedString :: Parser Char ScmType
+quotedString :: Parser Char ScmValue
 quotedString =
    ScmString <$>
       (join bracket (one '"') . many $
          oneOf [one '\\' >> commit (pElem "\\\""), pNotElem "\\\""])
 
-list :: Parser Char ScmType
+list :: Parser Char ScmValue
 list =
    bracket (one '(') (atmosphere >> one ')') $ do
       values <- many value
@@ -78,7 +78,7 @@ list =
                then ScmDottedList values <$> commit value
                else return$ ScmList values
 
-vector :: Parser Char ScmType
+vector :: Parser Char ScmValue
 vector = do
    one '#'
    ScmVector <$> bracket (one '(') (atmosphere >> one ')') (many value)
