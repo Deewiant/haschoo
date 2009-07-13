@@ -86,7 +86,6 @@ vector = do
 -- Pushes back anything relevant for other parsers
 delimiter :: Parser Char ()
 delimiter = oneOf [whitespaceOrComment, pElem "()\"" >>= reparse.return, eof]
- where
 
 atmosphere :: Parser Char ()
 atmosphere = void $ many whitespaceOrComment
@@ -95,10 +94,14 @@ whitespaceOrComment :: Parser Char ()
 whitespaceOrComment =
    oneOf [ void $ one ' '
          , void newline
-         , void $ one ';' >> commit (manyFinally notNewline newline) ]
+         , void comment ]
  where
    newline    = oneOf [ void $ one '\n'
                       , void $ one '\r' >> optional (one '\n') ]
+   comment = void $ do
+      one ';'
+      commit (many notNewline >> (void newline `onFail` return ()))
+
    notNewline = satisfy (`notElem` "\n\r")
 
 one :: Eq a => a -> Parser a a
