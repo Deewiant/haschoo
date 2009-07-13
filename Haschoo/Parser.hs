@@ -8,80 +8,80 @@ import Data.Char (isDigit)
 import Data.Maybe (isJust)
 import Text.ParserCombinators.Poly.Plain
 
-import Haschoo.Datum   (Datum(..))
-import Haschoo.ScmType (ScmType(ScmBool, ScmChar, ScmString, ScmInt))
+import Haschoo.ScmType (ScmType(..))
 
-parser :: Parser Char [Datum]
+parser :: Parser Char [ScmType]
 parser = do
-   ds <- many datum
+   ds <- many value
    eof
    return ds
 
-datum :: Parser Char Datum
-datum = do
+value :: Parser Char ScmType
+value = do
    atmosphere
    quoted <- optional (one '\'' >> commit atmosphere)
    dat    <- oneOf [ident, bool, number, character, quotedString, list, vector]
    return$ if isJust quoted
-              then Quoted dat
+              then ScmQuoted dat
               else dat
 
-ident :: Parser Char Datum
+ident :: Parser Char ScmType
 ident = do
    x <- oneOf [peculiar,ordinary]
    delimiter
    return x
  where
-   peculiar = ParsedIdentifier <$> oneOf [return <$> pElem "+-", string "..."]
+   peculiar = Unevaluated <$> oneOf [return <$> pElem "+-", string "..."]
    ordinary = do
       x  <- pElem initial
       xs <- many (pElem (initial ++ "+-.@" ++ ['0'..'9']))
-      return$ ParsedIdentifier (x:xs)
+      return$ Unevaluated (x:xs)
     where
       initial = ['a'..'z'] ++ "!$%&*/:<=>?^_~"
 
-bool :: Parser Char Datum
-bool = one '#' >> Sema . ScmBool . (=='t') <$> (pElem "tf")
+bool :: Parser Char ScmType
+bool = one '#' >> ScmBool . (=='t') <$> (pElem "tf")
 
 -- FIXME: only does base 10 integers
-number :: Parser Char Datum
+number :: Parser Char ScmType
 number = do
    x  <- satisfy isDigit
    xs <- commit $ manyFinally (satisfy isDigit) delimiter
-   return . Sema . ScmInt $ read (x:xs)
+   return . ScmInt $ read (x:xs)
 
-character :: Parser Char Datum
+character :: Parser Char ScmType
 character = do
    string "#\\"
-   c <- oneOf [named, (Sema . ScmChar) <$> next]
+   c <- oneOf [named, (ScmChar) <$> next]
    commit delimiter `usingError` "Invalid named character"
    return c
  where
-   named = oneOf [ string "space"   >> return (Sema (ScmChar ' '))
-                 , string "newline" >> return (Sema (ScmChar '\n')) ]
+   named = oneOf [ string "space"   >> return (ScmChar ' ')
+                 , string "newline" >> return (ScmChar '\n') ]
 
-quotedString :: Parser Char Datum
+quotedString :: Parser Char ScmType
 quotedString =
-   Sema . ScmString <$>
+   ScmString <$>
       (join bracket (one '"') . many $
          oneOf [one '\\' >> commit (pElem "\\\""), pNotElem "\\\""])
 
-list :: Parser Char Datum
+list :: Parser Char ScmType
 list =
    bracket (one '(') (atmosphere >> one ')') $ do
-      datums <- many datum
-      if null datums
-         then return$ List datums
+      values <- many value
+      if null values
+         then return$ ScmList values
          else do
             atmosphere
             dot <- optional (one '.')
             if isJust dot
-               then DottedList datums <$> commit datum
-               else return$ List datums
+               then ScmDottedList values <$> commit value
+               else return$ ScmList values
 
-vector :: Parser Char Datum
-vector =
-   one '#' >> Vector <$> bracket (one '(') (atmosphere >> one ')') (many datum)
+vector :: Parser Char ScmType
+vector = do
+   one '#'
+   ScmVector <$> bracket (one '(') (atmosphere >> one ')') (many value)
 
 -- Pushes back anything relevant for other parsers
 delimiter :: Parser Char ()
@@ -89,7 +89,7 @@ delimiter = oneOf [whitespaceOrComment, pElem "()\"" >>= reparse.return, eof]
  where
 
 atmosphere :: Parser Char ()
-atmosphere = many whitespaceOrComment >> return ()
+atmosphere = void $ many whitespaceOrComment
 
 whitespaceOrComment :: Parser Char ()
 whitespaceOrComment =

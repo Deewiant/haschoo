@@ -2,8 +2,13 @@
 
 module Haschoo.ScmType where
 
-data ScmType = ScmBool   Bool
-             | ScmChar   Char
-             | ScmString String
-             | ScmInt    Integer
+data ScmType = Unevaluated   String
+             | ScmBool       Bool
+             | ScmChar       Char
+             | ScmString     String
+             | ScmInt        Integer
+             | ScmList       [ScmType]
+             | ScmDottedList [ScmType] ScmType
+             | ScmVector     [ScmType]
+             | ScmQuoted     ScmType
  deriving Show
