@@ -70,13 +70,13 @@ list =
    bracket (one '(') (atmosphere >> one ')') $ do
       values <- many value
       if null values
-         then return$ ScmList values
+         then return$ Application values
          else do
             atmosphere
             dot <- optional (one '.')
             if isJust dot
-               then ScmDottedList values <$> commit value
-               else return$ ScmList values
+               then DottedList values <$> commit value
+               else return$ Application values
 
 vector :: Parser Char ScmValue
 vector = do

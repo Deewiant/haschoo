@@ -2,13 +2,18 @@
 
 module Haschoo.ScmValue where
 
-data ScmValue = Unevaluated   String
-              | ScmBool       Bool
-              | ScmChar       Char
-              | ScmString     String
-              | ScmInt        Integer
-              | ScmList       [ScmValue]
-              | ScmDottedList [ScmValue] ScmValue
-              | ScmVector     [ScmValue]
-              | ScmQuoted     ScmValue
+-- The list types:
+--   Application: (a b c)
+--   DottedList:  (a b . c)
+--   ScmList:     (list a b c)
+data ScmValue = Unevaluated String
+              | Application [ScmValue]
+              | DottedList  [ScmValue] ScmValue
+              | ScmBool     Bool
+              | ScmChar     Char
+              | ScmString   String
+              | ScmInt      Integer
+              | ScmList     [ScmValue]
+              | ScmVector   [ScmValue]
+              | ScmQuoted   ScmValue
  deriving Show
