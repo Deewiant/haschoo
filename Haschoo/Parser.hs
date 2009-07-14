@@ -31,11 +31,11 @@ ident = do
    delimiter
    return x
  where
-   peculiar = Unevaluated <$> oneOf [return <$> pElem "+-", string "..."]
+   peculiar = UnevaledId <$> oneOf [return <$> pElem "+-", string "..."]
    ordinary = do
       x  <- pElem initial
       xs <- many (pElem (initial ++ "+-.@" ++ ['0'..'9']))
-      return$ Unevaluated (x:xs)
+      return$ UnevaledId (x:xs)
     where
       initial = ['a'..'z'] ++ "!$%&*/:<=>?^_~"
 

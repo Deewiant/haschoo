@@ -6,7 +6,7 @@ module Haschoo.ScmValue where
 --   Application: (a b c)
 --   DottedList:  (a b . c)
 --   ScmList:     (list a b c)
-data ScmValue = Unevaluated String
+data ScmValue = UnevaledId  String
               | Application [ScmValue]
               | DottedList  [ScmValue] ScmValue
               | ScmBool     Bool
