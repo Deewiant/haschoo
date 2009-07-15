@@ -179,15 +179,14 @@ number = do
                  | otherwise   = do
       n <- oneOf [ do one '.'
                       n <- commit $ many1 (digit 10)
-                      hashes <- many (one '#')
-                      return . inexactHashes hashes . ScmRat $
-                         readPostDecimal n
+                      many (one '#')
+                      return . ScmReal $ readPostDecimal n
 
                  , do a <- many1 (digit 10)
                       one '.'
                       b <- commit $ many (digit 10)
-                      hashes <- many (one '#')
-                      return . inexactHashes hashes . ScmRat $ readDecimal a b
+                      many (one '#')
+                      return . ScmReal $ readDecimal a b
 
                  , do n <- many1 (digit 10)
                       hashes <- many1 (one '#')
@@ -232,10 +231,11 @@ number = do
    readInteger radix =
       fst.head . readInt (fromIntegral radix) (const True) digitToInt
 
+   readPostDecimal :: String -> Double
    readPostDecimal [] = 0
-   readPostDecimal xs = readInteger 10 xs % (10 ^ (length xs))
+   readPostDecimal xs = fromInteger (readInteger 10 xs) / (10 ^ (length xs))
 
-   readDecimal :: String -> String -> Rational
+   readDecimal :: String -> String -> Double
    readDecimal as bs = fromInteger (readInteger 10 as) + readPostDecimal bs
 
 -- Pushes back anything relevant for other parsers
