@@ -152,13 +152,11 @@ number = do
 
    real radix = do
       neg <- optional sign
-      n   <- ureal radix
-      return (applySign (fromMaybe 1 neg) n)
+      applySign (fromMaybe 1 neg) <$> ureal radix
 
    sreal radix = do
       neg <- sign
-      n   <- ureal radix
-      return (applySign neg n)
+      applySign neg <$> ureal radix
 
    applySign neg (ScmInt  n) = ScmInt  (fromIntegral neg * n)
    applySign neg (ScmRat  n) = ScmRat  (fromIntegral neg * n)
@@ -167,7 +165,7 @@ number = do
 
    ureal radix = oneOf [ decimal radix
                        , do a <- uint radix
-                            b <- commit.optional $ one '/' >> uint radix
+                            b <- optional $ one '/' >> uint radix
                             case b of
                                  Nothing -> tryExponent a
                                  Just n  -> return (mkRatio a n) ]
@@ -178,13 +176,13 @@ number = do
    decimal radix | radix /= 10 = fail "Decimal outside radix 10"
                  | otherwise   = do
       n <- oneOf [ do one '.'
-                      n <- commit $ many1 (digit 10)
+                      n <- many1 (digit 10)
                       many (one '#')
                       return . ScmReal $ readPostDecimal n
 
                  , do a <- many1 (digit 10)
                       one '.'
-                      b <- commit $ many (digit 10)
+                      b <- many (digit 10)
                       many (one '#')
                       return . ScmReal $ readDecimal a b
 
