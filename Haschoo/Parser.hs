@@ -232,6 +232,7 @@ number = do
    readInteger radix =
       fst.head . readInt (fromIntegral radix) (const True) digitToInt
 
+   readPostDecimal [] = 0
    readPostDecimal xs = readInteger 10 xs % (10 ^ (length xs))
 
    readDecimal :: String -> String -> Rational
