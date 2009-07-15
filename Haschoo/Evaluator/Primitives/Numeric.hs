@@ -2,17 +2,42 @@
 
 module Haschoo.Evaluator.Primitives.Numeric (primitives) where
 
-import Data.List (foldl', foldl1')
+import Data.Complex (Complex((:+)))
+import Data.List    (foldl', foldl1')
 
 import Haschoo.ScmValue (ScmValue(..), isNumeric, liftScmFrac2, liftScmNum2)
 
 primitives :: [(String, ScmValue)]
 primitives = map (\(a,b) -> (a, ScmFunc a b)) $
-   [ ("+", scmPlus)
+   [ ("number?",   ScmBool . scmIsNumber)
+   , ("complex?",  ScmBool . scmIsNumber)
+   , ("real?",     ScmBool . scmIsReal)
+   , ("rational?", ScmBool . scmIsRational)
+   , ("integer?",  ScmBool . scmIsInteger)
+   , ("+", scmPlus)
    , ("-", scmMinus)
    , ("*", scmMul)
    , ("/", scmDiv)
    ]
+
+scmIsNumber, scmIsReal, scmIsRational, scmIsInteger :: [ScmValue] -> Bool
+scmIsNumber [x] = isNumeric x
+scmIsNumber _   = wrongArgs "number?"
+
+scmIsReal [ScmComplex (_ :+ b)] = b == 0
+scmIsReal [x]                   = isNumeric x
+scmIsReal _                     = wrongArgs "real?"
+
+scmIsRational [ScmRat _] = True
+scmIsRational [_]        = False
+scmIsRational _          = wrongArgs "rational?"
+
+scmIsInteger [ScmInt     _]      = True
+scmIsInteger [ScmRat     x]      = x == fromInteger (round x)
+scmIsInteger [ScmReal    x]      = x == fromInteger (round x)
+scmIsInteger [ScmComplex (a:+b)] = b == 0 && a == fromInteger (round a)
+scmIsInteger [_]                 = False
+scmIsInteger _                   = wrongArgs "integer?"
 
 scmPlus, scmMinus, scmMul, scmDiv :: [ScmValue] -> ScmValue
 scmPlus [] = ScmInt 0
@@ -38,6 +63,7 @@ scmDiv (x:xs) = foldl' go (unint x) xs
    unint (ScmInt x) = ScmRat (fromInteger x)
    unint x          = x
 
-notNum, tooFewArgs :: String -> a
+notNum, tooFewArgs, wrongArgs :: String -> a
 notNum     = error . ("Nonnumeric argument to primitive procedure " ++)
-tooFewArgs = error . ("No arguments to primitive procedure " ++)
+tooFewArgs = error . ("Too few arguments to primitive procedure " ++)
+wrongArgs  = error . ("Wrong number of arguments to primitive procedure " ++)
