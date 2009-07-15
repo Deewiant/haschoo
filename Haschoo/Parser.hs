@@ -8,24 +8,28 @@ import Data.Char (isDigit)
 import Data.Maybe (isJust)
 import Text.ParserCombinators.Poly.Plain
 
-import Haschoo.ScmValue (ScmValue(..))
+import Haschoo.Datum (Datum(..))
+import Haschoo.ScmValue (ScmValue(ScmBool, ScmInt, ScmChar, ScmString))
 
-parser :: Parser Char [ScmValue]
+parser :: Parser Char [Datum]
 parser = do
-   ds <- many value
+   ds <- many datum
    eof
    return ds
 
-value :: Parser Char ScmValue
-value = do
+datum :: Parser Char Datum
+datum = do
    atmosphere
    quoted <- optional (one '\'' >> commit atmosphere)
-   dat    <- oneOf [ident, bool, number, character, quotedString, list, vector]
+   dat    <- oneOf [ident, list, vector, value]
    return$ if isJust quoted
-              then ScmQuoted dat
+              then Quoted dat
               else dat
 
-ident :: Parser Char ScmValue
+value :: Parser Char Datum
+value = Evaluated <$> oneOf [bool, number, character, quotedString]
+
+ident :: Parser Char Datum
 ident = do
    x <- oneOf [peculiar,ordinary]
    delimiter
@@ -65,23 +69,23 @@ quotedString =
       (join bracket (one '"') . many $
          oneOf [one '\\' >> commit (pElem "\\\""), pNotElem "\\\""])
 
-list :: Parser Char ScmValue
+list :: Parser Char Datum
 list =
    bracket (one '(') (atmosphere >> one ')') $ do
-      values <- many value
-      if null values
-         then return$ Application values
+      datums <- many datum
+      if null datums
+         then return$ UnevaledApp datums
          else do
             atmosphere
             dot <- optional (one '.')
             if isJust dot
-               then DottedList values <$> commit value
-               else return$ Application values
+               then DottedList datums <$> commit datum
+               else return$ UnevaledApp datums
 
-vector :: Parser Char ScmValue
+vector :: Parser Char Datum
 vector = do
    one '#'
-   ScmVector <$> bracket (one '(') (atmosphere >> one ')') (many value)
+   UnevaledVec <$> bracket (one '(') (atmosphere >> one ')') (many datum)
 
 -- Pushes back anything relevant for other parsers
 delimiter :: Parser Char ()
