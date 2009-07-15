@@ -4,12 +4,16 @@ module Haschoo.Parser (parser) where
 
 import Control.Applicative ((<$>))
 import Control.Monad (join)
-import Data.Char (isDigit)
-import Data.Maybe (isJust)
+import Data.Char (digitToInt, isDigit, isHexDigit, isOctDigit)
+import Data.Complex (Complex((:+)), mkPolar)
+import Data.Maybe (fromJust, fromMaybe, isJust)
+import Data.Ratio ((%))
+import Numeric (readInt)
 import Text.ParserCombinators.Poly.Plain
 
-import Haschoo.Datum (Datum(..))
-import Haschoo.ScmValue (ScmValue(ScmBool, ScmInt, ScmChar, ScmString))
+import Haschoo.Datum    (Datum(..))
+import Haschoo.ScmValue (ScmValue( ScmBool, ScmChar, ScmString
+                                 , ScmInt, ScmRat, ScmReal, ScmComplex))
 import Haschoo.Utils    (void)
 
 parser :: Parser Char [Datum]
@@ -47,13 +51,6 @@ ident = do
 bool :: Parser Char ScmValue
 bool = one '#' >> ScmBool . (=='t') <$> (pElem "tf")
 
--- FIXME: only does base 10 integers
-number :: Parser Char ScmValue
-number = do
-   x  <- satisfy isDigit
-   xs <- commit $ manyFinally (satisfy isDigit) delimiter
-   return . ScmInt $ read (x:xs)
-
 character :: Parser Char ScmValue
 character = do
    string "#\\"
@@ -87,6 +84,158 @@ vector :: Parser Char Datum
 vector = do
    one '#'
    UnevaledVec <$> bracket (one '(') (atmosphere >> one ')') (many datum)
+
+number :: Parser Char ScmValue
+number = do
+   (radix,exact) <- prefix
+
+   let gotPrefix = isJust radix || isJust exact
+   n <- (if gotPrefix then commit else id) $ complex (fromMaybe 10 radix)
+
+   delimiter
+
+   return$ if fromMaybe True exact
+              then n
+              else case n of
+                        ScmInt x -> ScmReal (fromInteger  x)
+                        ScmRat x -> ScmReal (fromRational x)
+                        _        -> n
+ where
+   prefix = do
+      r <- radix
+      e <- exactness
+      -- They can be in either order
+      flip (,) e <$> if isJust r
+                        then return r
+                        else radix
+    where
+      radix     = f [('b',2), ('o',8), ('d',10), ('x',16)]
+      exactness = f [('e',True), ('i',False)]
+      f xs = optional $ do
+         one '#'
+         fromJust . (`lookup` xs) <$> pElem (map fst xs)
+
+   complex radix =
+      oneOf [ do n <- sreal radix
+                 one 'i'
+                 return (mkImaginary n)
+
+            , do a  <- real radix
+                 at <- commit $ optional (one '@')
+                 if isJust at
+                    then mkComplex mkPolar a <$> real radix
+                    else do
+                       b <- optional $
+                               oneOf [ imaginaryUnit
+                                     , do n <- sreal radix
+                                          commit (one 'i')
+                                          return n ]
+
+                       return $ case b of
+                                     Nothing -> a
+                                     Just n  -> mkComplex (:+) a n
+
+            , mkImaginary <$> imaginaryUnit ]
+    where
+      imaginaryUnit = do
+         neg <- sign
+         one 'i'
+         return (ScmInt neg)
+
+      mkImaginary     = mkComplex (:+) (ScmInt 0)
+      mkComplex f a b = ScmComplex $ f (toDouble a) (toDouble b)
+
+   toDouble (ScmInt  i) = fromInteger  i
+   toDouble (ScmRat  r) = fromRational r
+   toDouble (ScmReal r) = r
+   toDouble _           = error "number.toDouble :: internal error"
+
+   real radix = do
+      neg <- optional sign
+      n   <- ureal radix
+      return (applySign (fromMaybe 1 neg) n)
+
+   sreal radix = do
+      neg <- sign
+      n   <- ureal radix
+      return (applySign neg n)
+
+   applySign neg (ScmInt  n) = ScmInt  (fromIntegral neg * n)
+   applySign neg (ScmRat  n) = ScmRat  (fromIntegral neg * n)
+   applySign neg (ScmReal n) = ScmReal (fromIntegral neg * n)
+   applySign _   _           = error "number.applySign :: іnternal error"
+
+   ureal radix = oneOf [ decimal radix
+                       , do a <- uint radix
+                            b <- commit.optional $ one '/' >> uint radix
+                            case b of
+                                 Nothing -> tryExponent a
+                                 Just n  -> return (mkRatio a n) ]
+
+   mkRatio (ScmInt a) (ScmInt b) = ScmRat (a % b)
+   mkRatio _          _          = error "number.mkRatio :: internal error"
+
+   decimal radix | radix /= 10 = fail "Decimal outside radix 10"
+                 | otherwise   = do
+      n <- oneOf [ do one '.'
+                      n <- commit $ many1 (digit 10)
+                      hashes <- many (one '#')
+                      return . inexactHashes hashes . ScmRat $
+                         readPostDecimal n
+
+                 , do a <- many1 (digit 10)
+                      one '.'
+                      b <- commit $ many (digit 10)
+                      hashes <- many (one '#')
+                      return . inexactHashes hashes . ScmRat $ readDecimal a b
+
+                 , do n <- many1 (digit 10)
+                      hashes <- many1 (one '#')
+                      one '.'
+                      hashes2 <- commit $ many (one '#')
+                      return . inexactHashes (hashes ++ hashes2) . ScmInt $
+                         readInteger 10 n
+                 ]
+      tryExponent n
+
+   tryExponent n = do
+      ex <- optional $ do pElem "esfdlESFDL" -- Ignore the exponent: all Double
+                          neg <- optional sign
+                          xs  <- commit $ many1 (digit 10)
+                          return$ (fromMaybe 1 neg) * readInteger 10 xs
+      return$ case ex of
+                   Nothing -> n
+                   Just e  -> ScmReal (10^e * toDouble n)
+
+   uint radix = do
+      n <- many1 (digit radix)
+      hashes <- many (one '#')
+      return . inexactHashes hashes . ScmInt $ readInteger radix n
+
+   -- If any # were present, the value is inexact (R5RS 6.2.4)
+   inexactHashes :: String -> ScmValue -> ScmValue
+   inexactHashes [] = id
+   inexactHashes _  = ScmReal . toDouble
+
+   digit :: Int -> Parser Char Char
+   digit 2  = pElem "01"
+   digit 8  = satisfy isOctDigit
+   digit 10 = satisfy isDigit
+   digit 16 = satisfy isHexDigit
+   digit _  = error "number.digit :: internal error"
+
+   sign = (\c -> if c == '+' then 1 else -1) <$> pElem "+-"
+
+   -- These read functions all assume correctly formed input
+
+   readInteger :: Int -> String -> Integer
+   readInteger radix =
+      fst.head . readInt (fromIntegral radix) (const True) digitToInt
+
+   readPostDecimal xs = readInteger 10 xs % (10 ^ (length xs))
+
+   readDecimal :: String -> String -> Rational
+   readDecimal as bs = fromInteger (readInteger 10 as) + readPostDecimal bs
 
 -- Pushes back anything relevant for other parsers
 delimiter :: Parser Char ()
