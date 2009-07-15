@@ -12,3 +12,11 @@ showScmList f xs = concat ["(", intercalate " " (map f xs), ")"]
 
 void :: Functor f => f a -> f ()
 void = fmap (const ())
+
+infixl 0 $<
+($<) :: a -> (a -> b) -> b
+($<) = flip ($)
+
+infixl 8 .:
+(.:) :: (d -> c) -> (a -> b -> d) -> a -> b -> c
+f .: g = \x y -> f (g x y)

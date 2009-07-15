@@ -2,10 +2,12 @@
 
 module Haschoo.Evaluator.Primitives.Numeric (primitives) where
 
-import Data.Complex (Complex((:+)))
-import Data.List    (foldl', foldl1')
+import Control.Arrow ((&&&))
+import Data.Complex  (Complex((:+)))
+import Data.List     (foldl', foldl1')
 
 import Haschoo.ScmValue (ScmValue(..), isNumeric, liftScmFrac2, liftScmNum2)
+import Haschoo.Utils    (($<), (.:))
 
 primitives :: [(String, ScmValue)]
 primitives = map (\(a,b) -> (a, ScmFunc a b)) $
@@ -14,6 +16,8 @@ primitives = map (\(a,b) -> (a, ScmFunc a b)) $
    , ("real?",     ScmBool . scmIsReal)
    , ("rational?", ScmBool . scmIsRational)
    , ("integer?",  ScmBool . scmIsInteger)
+   , "exact?"   $< id &&& ScmBool       .: scmIsExact
+   , "inexact?" $< id &&& ScmBool . not .: scmIsExact
    , ("+", scmPlus)
    , ("-", scmMinus)
    , ("*", scmMul)
@@ -38,6 +42,13 @@ scmIsInteger [ScmReal    x]      = x == fromInteger (round x)
 scmIsInteger [ScmComplex (a:+b)] = b == 0 && a == fromInteger (round a)
 scmIsInteger [_]                 = False
 scmIsInteger _                   = wrongArgs "integer?"
+
+scmIsExact :: String -> [ScmValue] -> Bool
+scmIsExact _ [ScmInt _]        = True
+scmIsExact _ [ScmRat _]        = True
+scmIsExact _ [x] | isNumeric x = False
+scmIsExact s [_]               = notNum s
+scmIsExact s _                 = wrongArgs s
 
 scmPlus, scmMinus, scmMul, scmDiv :: [ScmValue] -> ScmValue
 scmPlus [] = ScmInt 0
