@@ -10,6 +10,7 @@ import Text.ParserCombinators.Poly.Plain
 
 import Haschoo.Datum (Datum(..))
 import Haschoo.ScmValue (ScmValue(ScmBool, ScmInt, ScmChar, ScmString))
+import Haschoo.Utils    (void)
 
 parser :: Parser Char [Datum]
 parser = do
@@ -132,6 +133,3 @@ pNotElem = satisfy . flip notElem
 
 usingError :: Parser a b -> String -> Parser a b
 usingError p = adjustErr p . const
-
-void :: Functor f => f a -> f ()
-void = fmap (const ())
