@@ -39,8 +39,8 @@ scmShow (ScmRat n)    =
 
 scmShow (ScmComplex (a :+ b)) =
    show a ++ concat (if b < 0
-                        then ["-", show (-b), "i"]
-                        else ["+", show b])
+                        then ["-", show (-b)]
+                        else ["+", show b]) ++ "i"
 
 scmShow (ScmChar c) | c == ' '  = "#\\space"
                     | c == '\n' = "#\\newline"
