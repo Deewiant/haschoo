@@ -26,29 +26,29 @@ primitives = map (\(a,b) -> (a, ScmFunc a b)) $
 
 scmIsNumber, scmIsReal, scmIsRational, scmIsInteger :: [ScmValue] -> Bool
 scmIsNumber [x] = isNumeric x
-scmIsNumber _   = wrongArgs "number?"
+scmIsNumber _   = tooManyArgs "number?"
 
 scmIsReal [ScmComplex (_ :+ b)] = b == 0
 scmIsReal [x]                   = isNumeric x
-scmIsReal _                     = wrongArgs "real?"
+scmIsReal _                     = tooManyArgs "real?"
 
 scmIsRational [ScmRat _] = True
 scmIsRational [_]        = False
-scmIsRational _          = wrongArgs "rational?"
+scmIsRational _          = tooManyArgs "rational?"
 
 scmIsInteger [ScmInt     _]      = True
 scmIsInteger [ScmRat     x]      = x == fromInteger (round x)
 scmIsInteger [ScmReal    x]      = x == fromInteger (round x)
 scmIsInteger [ScmComplex (a:+b)] = b == 0 && a == fromInteger (round a)
 scmIsInteger [_]                 = False
-scmIsInteger _                   = wrongArgs "integer?"
+scmIsInteger _                   = tooManyArgs "integer?"
 
 scmIsExact :: String -> [ScmValue] -> Bool
 scmIsExact _ [ScmInt _]        = True
 scmIsExact _ [ScmRat _]        = True
 scmIsExact _ [x] | isNumeric x = False
 scmIsExact s [_]               = notNum s
-scmIsExact s _                 = wrongArgs s
+scmIsExact s _                 = tooManyArgs s
 
 scmPlus, scmMinus, scmMul, scmDiv :: [ScmValue] -> ScmValue
 scmPlus [] = ScmInt 0
@@ -74,7 +74,7 @@ scmDiv (x:xs) = foldl' go (unint x) xs
    unint (ScmInt x) = ScmRat (fromInteger x)
    unint x          = x
 
-notNum, tooFewArgs, wrongArgs :: String -> a
-notNum     = error . ("Nonnumeric argument to primitive procedure " ++)
-tooFewArgs = error . ("Too few arguments to primitive procedure " ++)
-wrongArgs  = error . ("Wrong number of arguments to primitive procedure " ++)
+notNum, tooFewArgs, tooManyArgs :: String -> a
+notNum      = error . ("Nonnumeric argument to primitive procedure " ++)
+tooFewArgs  = error . ("Too few arguments to primitive procedure " ++)
+tooManyArgs = error . ("Too many arguments to primitive procedure " ++)
