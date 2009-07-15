@@ -33,14 +33,19 @@ scmShow (ScmBool b)   = '#' : if b then "t" else "f"
 scmShow (ScmFunc s _) = s
 scmShow (ScmList xs)  = showScmList scmShow xs
 scmShow (ScmInt n)    = show n
-scmShow (ScmReal n)   = show n
+scmShow (ScmReal n)
+   | isNaN      n = "+nan.#"
+   | isInfinite n = (if n < 0 then '-' else '+') : "inf.#"
+   | otherwise    = show n
 scmShow (ScmRat n)    =
    concat [show (numerator n), "/", show (denominator n)]
 
 scmShow (ScmComplex (a :+ b)) =
-   show a ++ concat (if b < 0
-                        then ["-", show (-b)]
-                        else ["+", show b]) ++ "i"
+   let bs = scmShow (ScmReal b)
+    in concat [ scmShow (ScmReal a)
+              , if head bs `elem` "-+" then [] else "+"
+              , bs
+              , "i" ]
 
 scmShow (ScmChar c) | c == ' '  = "#\\space"
                     | c == '\n' = "#\\newline"

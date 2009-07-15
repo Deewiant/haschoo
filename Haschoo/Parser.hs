@@ -163,7 +163,9 @@ number = do
    applySign neg (ScmReal n) = ScmReal (fromIntegral neg * n)
    applySign _   _           = error "number.applySign :: іnternal error"
 
-   ureal radix = oneOf [ decimal radix
+   ureal radix = oneOf [ string "nan.#" >> return (ScmReal $ 0/0)
+                       , string "inf.#" >> return (ScmReal $ 1/0)
+                       , decimal radix
                        , do a <- uint radix
                             b <- optional $ one '/' >> uint radix
                             case b of
