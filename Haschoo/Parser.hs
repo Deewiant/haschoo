@@ -205,7 +205,7 @@ number = do
                           return$ (fromMaybe 1 neg) * readInteger 10 xs
       return$ case ex of
                    Nothing -> n
-                   Just e  -> ScmReal (10^e * toDouble n)
+                   Just e  -> ScmReal (10^^e * toDouble n)
 
    uint radix = do
       n <- many1 (digit radix)
