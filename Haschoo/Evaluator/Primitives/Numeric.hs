@@ -112,15 +112,19 @@ scmIsEven s [x] = if isInteger x
 scmIsEven s _   = tooManyArgs s
 
 scmMax, scmMin :: [ScmValue] -> ErrOr ScmValue
-scmMax []     = tooFewArgs "max"
-scmMax (x:xs) = if isNumeric x then foldM go x xs else notNum "max"
- where
-   go n x = if isNumeric x then liftScmReal2 max n x else notNum "max"
+scmMax = scmMinMax max "max"
+scmMin = scmMinMax min "min"
 
-scmMin []     = tooFewArgs "min"
-scmMin (x:xs) = if isNumeric x then foldM go x xs else notNum "min"
+scmMinMax :: (forall a. Real a => a -> a -> a) -> String
+          -> [ScmValue] -> ErrOr ScmValue
+scmMinMax _ s []     = tooFewArgs s
+scmMinMax f s (x:xs) = if isNumeric x then foldM go x xs else notNum s
  where
-   go n x = if isNumeric x then liftScmReal2 min n x else notNum "min"
+   go n x = if isNumeric x
+               then case liftScmReal2 f n x of
+                         Left _ -> notReal s
+                         m      -> m
+               else notNum s
 
 ---- +-*/
 
@@ -184,9 +188,10 @@ scmGcdLcm f s = fmap fin . foldM go (True,0)
 
 -------------
 
-notInt, notNum, tooFewArgs, tooManyArgs :: String -> ErrOr a
+notInt, notNum, notReal, tooFewArgs, tooManyArgs :: String -> ErrOr a
 notInt      = fail . ("Noninteger argument to primitive procedure " ++)
 notNum      = fail . ("Nonnumeric argument to primitive procedure " ++)
+notReal     = fail . ("Nonreal argument to primitive procedure " ++)
 tooFewArgs  = fail . ("Too few arguments to primitive procedure " ++)
 tooManyArgs = fail . ("Too many arguments to primitive procedure " ++)
 
@@ -280,19 +285,41 @@ liftScmFrac2 _ _ _ = fail "liftScmFrac2 :: internal error"
 --- Real
 liftScmReal2 :: (forall a. Real a => a -> a -> a)
              -> (ScmValue -> ScmValue -> ErrOr ScmValue)
-liftScmReal2 f (ScmInt     a) (ScmInt     b) = Right . ScmInt    $ f a b
-liftScmReal2 f (ScmRat     a) (ScmRat     b) = Right . ScmRat    $ f a b
-liftScmReal2 f (ScmReal    a) (ScmReal    b) = Right . ScmReal   $ f a b
+liftScmReal2 _ (ScmComplex a) _ | imagPart a /= 0 =
+   fail "liftScmReal2 :: complex"
 
--- Int+{Rat,Real}
-liftScmReal2 f (ScmInt     a) (ScmRat     b) = Right . ScmRat    $ f (fInt a) b
-liftScmReal2 f (ScmRat     a) (ScmInt     b) = Right . ScmRat    $ f a (fInt b)
-liftScmReal2 f (ScmInt     a) (ScmReal    b) = Right . ScmReal   $ f (fInt a) b
-liftScmReal2 f (ScmReal    a) (ScmInt     b) = Right . ScmReal   $ f a (fInt b)
+liftScmReal2 _ _ (ScmComplex b) | imagPart b /= 0 =
+   fail "liftScmReal2 :: complex"
 
--- Rat+Real
-liftScmReal2 f (ScmRat     a) (ScmReal    b) = Right . ScmReal   $ f (fRat a) b
-liftScmReal2 f (ScmReal    a) (ScmRat     b) = Right . ScmReal   $ f a (fRat b)
+liftScmReal2 f (ScmInt     a) (ScmInt     b) = Right . ScmInt  $ f a b
+liftScmReal2 f (ScmRat     a) (ScmRat     b) = Right . ScmRat  $ f a b
+liftScmReal2 f (ScmReal    a) (ScmReal    b) = Right . ScmReal $ f a b
+liftScmReal2 f (ScmComplex a) (ScmComplex b) =
+   Right . ScmReal $ (f `on` realPart) a b
+
+-- Int+{Rat,Real,Complex}
+liftScmReal2 f (ScmInt     a) (ScmRat     b) = Right . ScmRat  $ f (fInt a) b
+liftScmReal2 f (ScmRat     a) (ScmInt     b) = Right . ScmRat  $ f a (fInt b)
+liftScmReal2 f (ScmInt     a) (ScmReal    b) = Right . ScmReal $ f (fInt a) b
+liftScmReal2 f (ScmReal    a) (ScmInt     b) = Right . ScmReal $ f a (fInt b)
+liftScmReal2 f (ScmInt     a) (ScmComplex b) =
+   Right . ScmReal $ f (fInt a) (realPart b)
+liftScmReal2 f (ScmComplex a) (ScmInt     b) =
+   Right . ScmReal $ f (realPart a) (fInt b)
+
+-- Rat+{Real,Complex}
+liftScmReal2 f (ScmRat     a) (ScmReal    b) = Right . ScmReal $ f (fRat a) b
+liftScmReal2 f (ScmReal    a) (ScmRat     b) = Right . ScmReal $ f a (fRat b)
+liftScmReal2 f (ScmRat     a) (ScmComplex b) =
+   Right . ScmReal $ f (fRat a) (realPart b)
+liftScmReal2 f (ScmComplex a) (ScmRat     b) =
+   Right . ScmReal $ f (realPart a) (fRat b)
+
+-- Real+Complex
+liftScmReal2 f (ScmReal    a) (ScmComplex b) =
+   Right . ScmReal $ f a (realPart b)
+liftScmReal2 f (ScmComplex a) (ScmReal    b) =
+   Right . ScmReal $ f (realPart a) b
 
 liftScmReal2 _ _ _ = fail "liftScmReal2 :: internal error"
 
