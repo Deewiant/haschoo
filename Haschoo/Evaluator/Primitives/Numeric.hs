@@ -1,12 +1,14 @@
 -- File created: 2009-07-15 21:15:44
 
+{-# LANGUAGE Rank2Types #-}
+
 module Haschoo.Evaluator.Primitives.Numeric (primitives) where
 
 import Control.Arrow ((&&&))
 import Data.Complex  (Complex((:+)))
 import Data.List     (foldl', foldl1')
 
-import Haschoo.ScmValue (ScmValue(..), isNumeric, liftScmFrac2, liftScmNum2)
+import Haschoo.ScmValue (ScmValue(..))
 import Haschoo.Utils    (($<), (.:))
 
 primitives :: [(String, ScmValue)]
@@ -78,3 +80,58 @@ notNum, tooFewArgs, tooManyArgs :: String -> a
 notNum      = error . ("Nonnumeric argument to primitive procedure " ++)
 tooFewArgs  = error . ("Too few arguments to primitive procedure " ++)
 tooManyArgs = error . ("Too many arguments to primitive procedure " ++)
+
+isNumeric :: ScmValue -> Bool
+isNumeric (ScmInt     _) = True
+isNumeric (ScmRat     _) = True
+isNumeric (ScmReal    _) = True
+isNumeric (ScmComplex _) = True
+isNumeric _              = False
+
+-- Return results with the more inexact constructor of the two given
+--
+-- Ugly and verbose... too lazy to metaize these
+liftScmNum2 :: (forall a. Num a => a -> a -> a)
+            -> (ScmValue -> ScmValue -> ScmValue)
+liftScmNum2 f (ScmInt     a) (ScmInt     b) = ScmInt    $ f a b
+liftScmNum2 f (ScmRat     a) (ScmRat     b) = ScmRat    $ f a b
+liftScmNum2 f (ScmReal    a) (ScmReal    b) = ScmReal   $ f a b
+liftScmNum2 f (ScmComplex a) (ScmComplex b) = ScmComplex$ f a b
+
+-- Int+{Rat,Real,Complex}
+liftScmNum2 f (ScmInt     a) (ScmRat     b) = ScmRat    $ f (fromInteger a) b
+liftScmNum2 f (ScmRat     a) (ScmInt     b) = ScmRat    $ f a (fromInteger b)
+liftScmNum2 f (ScmInt     a) (ScmReal    b) = ScmReal   $ f (fromInteger a) b
+liftScmNum2 f (ScmReal    a) (ScmInt     b) = ScmReal   $ f a (fromInteger b)
+liftScmNum2 f (ScmInt     a) (ScmComplex b) = ScmComplex$ f (fromInteger a) b
+liftScmNum2 f (ScmComplex a) (ScmInt     b) = ScmComplex$ f a (fromInteger b)
+
+-- Rat+{Real,Complex}
+liftScmNum2 f (ScmRat     a) (ScmReal    b) = ScmReal   $ f (fromRational a) b
+liftScmNum2 f (ScmReal    a) (ScmRat     b) = ScmReal   $ f a (fromRational b)
+liftScmNum2 f (ScmRat     a) (ScmComplex b) = ScmComplex$ f (fromRational a) b
+liftScmNum2 f (ScmComplex a) (ScmRat     b) = ScmComplex$ f a (fromRational b)
+
+-- Real+Complex
+liftScmNum2 f (ScmReal    a) (ScmComplex b) = ScmComplex$ f (a :+ 0) b
+liftScmNum2 f (ScmComplex a) (ScmReal    b) = ScmComplex$ f a (b :+ 0)
+
+liftScmNum2 _ _ _ = error "liftScmNum2 :: internal error"
+
+liftScmFrac2 :: (forall a. Fractional a => a -> a -> a)
+             -> (ScmValue -> ScmValue -> ScmValue)
+liftScmFrac2 f (ScmRat     a) (ScmRat     b) = ScmRat    $ f a b
+liftScmFrac2 f (ScmReal    a) (ScmReal    b) = ScmReal   $ f a b
+liftScmFrac2 f (ScmComplex a) (ScmComplex b) = ScmComplex$ f a b
+
+-- Rat+{Real,Complex}
+liftScmFrac2 f (ScmRat     a) (ScmReal    b) = ScmReal   $ f (fromRational a) b
+liftScmFrac2 f (ScmReal    a) (ScmRat     b) = ScmReal   $ f a (fromRational b)
+liftScmFrac2 f (ScmRat     a) (ScmComplex b) = ScmComplex$ f (fromRational a) b
+liftScmFrac2 f (ScmComplex a) (ScmRat     b) = ScmComplex$ f a (fromRational b)
+
+-- Real+Complex
+liftScmFrac2 f (ScmReal    a) (ScmComplex b) = ScmComplex$ f (a :+ 0) b
+liftScmFrac2 f (ScmComplex a) (ScmReal    b) = ScmComplex$ f a (b :+ 0)
+
+liftScmFrac2 _ _ _ = error "liftScmFrac2 :: internal error"
