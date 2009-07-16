@@ -4,7 +4,6 @@
 
 module Haschoo.Evaluator.Primitives.Numeric (primitives) where
 
-import Control.Applicative ((<$>))
 import Control.Arrow       ((&&&), (***))
 import Control.Monad       (ap, foldM)
 import Data.Complex        (Complex((:+)), imagPart, realPart)
@@ -120,8 +119,8 @@ scmMinMax :: (forall a. Real a => a -> a -> a) -> String
 scmMinMax _ s []     = tooFewArgs s
 scmMinMax f s (x:xs) = if isNumeric x then foldM go x xs else notNum s
  where
-   go n x = if isNumeric x
-               then case liftScmReal2 f n x of
+   go n a = if isNumeric a
+               then case liftScmReal2 f n a of
                          Left _ -> notReal s
                          m      -> m
                else notNum s
@@ -139,7 +138,7 @@ scmMinus (x:_) | not (isNumeric x) = notNum "-"
 scmMinus [x]                       = liftScmNum negate x
 scmMinus (x:xs)                    = foldM go x xs
  where
-   go n x = if isNumeric x then liftScmNum2 (-) n x else notNum "-"
+   go n a = if isNumeric a then liftScmNum2 (-) n a else notNum "-"
 
 scmMul [] = Right $ ScmInt 1
 scmMul xs = foldM go (ScmInt 1) xs
@@ -152,10 +151,10 @@ scmDiv (x:xs) =
                     []  -> liftScmFrac recip
                     _:_ -> flip (foldM go) xs
  where
-   go n x = unint x >>= liftScmFrac2 (/) n
+   go n a = unint a >>= liftScmFrac2 (/) n
 
-   unint (ScmInt x) = Right $ ScmRat (fromInteger x)
-   unint x          = if isNumeric x then Right x else notNum "/"
+   unint (ScmInt n) = Right $ ScmRat (fromInteger n)
+   unint n          = if isNumeric x then Right n else notNum "/"
 
 ---- quot rem mod
 
@@ -214,6 +213,7 @@ asInt _ (ScmInt     x)        = Right (True,  x)
 asInt _ (ScmRat     x)        = Right (True,  numerator x)
 asInt _ (ScmReal    x)        = Right (False, round x)
 asInt _ (ScmComplex (x:+0))   = Right (False, round x)
+asInt _ _                     = error "This can't happen"
 
 -- Lift ScmValue's numeric types to a common type
 --
