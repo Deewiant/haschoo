@@ -1,16 +1,17 @@
 -- File created: 2009-07-15 21:15:44
 
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE FlexibleInstances, Rank2Types, TypeSynonymInstances #-}
 
 module Haschoo.Evaluator.Primitives.Numeric (primitives) where
 
 import Control.Applicative ((<$>))
 import Control.Arrow       ((&&&))
-import Control.Monad       (foldM)
-import Data.Complex        (Complex((:+)))
+import Control.Monad       (ap, foldM)
+import Data.Complex        (Complex((:+)), imagPart, realPart)
+import Data.Function       (on)
 
 import Haschoo.ScmValue (ScmValue(..))
-import Haschoo.Utils    (ErrOr, ($<), (.:))
+import Haschoo.Utils    (ErrOr, allM, ($<), (.:))
 
 primitives :: [(String, ScmValue)]
 primitives = map (\(a,b) -> (a, ScmFunc a b)) $
@@ -19,13 +20,23 @@ primitives = map (\(a,b) -> (a, ScmFunc a b)) $
    , ("real?",     fmap ScmBool . scmIsReal)
    , ("rational?", fmap ScmBool . scmIsRational)
    , ("integer?",  fmap ScmBool . scmIsInteger)
+
    , "exact?"   $< id &&& fmap  ScmBool        .: scmIsExact
    , "inexact?" $< id &&& fmap (ScmBool . not) .: scmIsExact
+
+   , "="  $< id &&& fmap ScmBool .: scmCompare (==)
+   , "<"  $< id &&& fmap ScmBool .: scmCompare (<)
+   , ">"  $< id &&& fmap ScmBool .: scmCompare (>)
+   , "<=" $< id &&& fmap ScmBool .: scmCompare (<=)
+   , ">=" $< id &&& fmap ScmBool .: scmCompare (>=)
+
    , ("+", scmPlus)
    , ("-", scmMinus)
    , ("*", scmMul)
    , ("/", scmDiv)
    ]
+
+---- Predicates
 
 scmIsNumber, scmIsReal, scmIsRational, scmIsInteger :: [ScmValue] -> ErrOr Bool
 scmIsNumber [x] = Right $ isNumeric x
@@ -52,6 +63,20 @@ scmIsExact _ [ScmRat _]        = Right True
 scmIsExact _ [x] | isNumeric x = Right False
 scmIsExact s [_]               = notNum s
 scmIsExact s _                 = tooManyArgs s
+
+---- Comparison
+
+scmCompare :: (forall a. Real a => a -> a -> Bool)
+           -> String -> [ScmValue] -> ErrOr Bool
+scmCompare _ s [] = tooFewArgs s
+scmCompare p s xs = allM f . (zip`ap`tail) $ xs
+ where
+   f (a,b) = case liftScmRealA2 p a b of
+                  Left _ ->
+                     fail$ "Nonreal argument to primitive procedure " ++ s
+                  x      -> x
+
+---- +-*/
 
 scmPlus, scmMinus, scmMul, scmDiv :: [ScmValue] -> ErrOr ScmValue
 scmPlus [] = Right $ ScmInt 0
@@ -89,7 +114,10 @@ isNumeric (ScmReal    _) = True
 isNumeric (ScmComplex _) = True
 isNumeric _              = False
 
--- Return results with the more inexact constructor of the two given
+-- Lift ScmValue's numeric types to a common type
+--
+-- Versions without 'A' at the end also return results in the correct
+-- constructor of the two given
 --
 -- Ugly and verbose... too lazy to metaize these
 liftScmNum2 :: (forall a. Num a => a -> a -> a)
@@ -136,6 +164,39 @@ liftScmFrac2 f (ScmReal    a) (ScmComplex b) = Right . ScmComplex$ f (a :+ 0) b
 liftScmFrac2 f (ScmComplex a) (ScmReal    b) = Right . ScmComplex$ f a (b :+ 0)
 
 liftScmFrac2 _ _ _ = fail "liftScmFrac2 :: internal error"
+
+liftScmRealA2 :: (forall a. Real a => a -> a -> b)
+              -> (ScmValue -> ScmValue -> ErrOr b)
+liftScmRealA2 _ (ScmComplex a) _ | imagPart a /= 0 =
+   fail "liftScmRealA2 :: complex"
+
+liftScmRealA2 _ _ (ScmComplex b) | imagPart b /= 0 =
+   fail "liftScmRealA2 :: complex"
+
+liftScmRealA2 f (ScmInt     a) (ScmInt     b) = Right $ f a b
+liftScmRealA2 f (ScmRat     a) (ScmRat     b) = Right $ f a b
+liftScmRealA2 f (ScmReal    a) (ScmReal    b) = Right $ f a b
+liftScmRealA2 f (ScmComplex a) (ScmComplex b) = Right $ (f `on` realPart) a b
+
+-- Int+{Rat,Real,Complex}
+liftScmRealA2 f (ScmInt     a) (ScmRat     b) = Right $ f (fInt a) b
+liftScmRealA2 f (ScmRat     a) (ScmInt     b) = Right $ f a (fInt b)
+liftScmRealA2 f (ScmInt     a) (ScmReal    b) = Right $ f (fInt a) b
+liftScmRealA2 f (ScmReal    a) (ScmInt     b) = Right $ f a (fInt b)
+liftScmRealA2 f (ScmInt     a) (ScmComplex b) = Right $ f (fInt a) (realPart b)
+liftScmRealA2 f (ScmComplex a) (ScmInt     b) = Right $ f (realPart a) (fInt b)
+
+-- Rat+{Real,Complex}
+liftScmRealA2 f (ScmRat     a) (ScmReal    b) = Right $ f (fRat a) b
+liftScmRealA2 f (ScmReal    a) (ScmRat     b) = Right $ f a (fRat b)
+liftScmRealA2 f (ScmRat     a) (ScmComplex b) = Right $ f (fRat a) (realPart b)
+liftScmRealA2 f (ScmComplex a) (ScmRat     b) = Right $ f (realPart a) (fRat b)
+
+-- Real+Complex
+liftScmRealA2 f (ScmReal    a) (ScmComplex b) = Right $ f a (realPart b)
+liftScmRealA2 f (ScmComplex a) (ScmReal    b) = Right $ f (realPart a) b
+
+liftScmRealA2 _ _ _ = fail "liftScmRealA2 :: internal error"
 
 fInt :: Num a => Integer -> a
 fInt = fromInteger
