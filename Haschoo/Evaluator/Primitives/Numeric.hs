@@ -84,8 +84,7 @@ scmCompare _ s [] = tooFewArgs s
 scmCompare p s xs = allM f . (zip`ap`tail) $ xs
  where
    f (a,b) = case liftScmRealA2 p a b of
-                  Left _ ->
-                     fail$ "Nonreal argument to primitive procedure " ++ s
+                  Left _ -> notReal s
                   x      -> x
 
 scmIsZero :: [ScmValue] -> ErrOr Bool
