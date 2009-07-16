@@ -193,7 +193,7 @@ number = do
                       one '.'
                       hashes2 <- commit $ many (one '#')
                       return . inexactHashes (hashes ++ hashes2) . ScmInt $
-                         readInteger 10 n
+                         readInteger 10 (n ++ map (const '0') hashes)
                  ]
       tryExponent n
 
@@ -209,7 +209,8 @@ number = do
    uint radix = do
       n <- many1 (digit radix)
       hashes <- many (one '#')
-      return . inexactHashes hashes . ScmInt $ readInteger radix n
+      return . inexactHashes hashes . ScmInt $
+         readInteger radix (n ++ map (const '0') hashes)
 
    -- If any # were present, the value is inexact (R5RS 6.2.4)
    inexactHashes :: String -> ScmValue -> ScmValue
