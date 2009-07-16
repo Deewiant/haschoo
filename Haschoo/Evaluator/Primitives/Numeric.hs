@@ -4,9 +4,10 @@
 
 module Haschoo.Evaluator.Primitives.Numeric (primitives) where
 
-import Control.Arrow ((&&&))
-import Control.Monad (foldM)
-import Data.Complex  (Complex((:+)))
+import Control.Applicative ((<$>))
+import Control.Arrow       ((&&&))
+import Control.Monad       (foldM)
+import Data.Complex        (Complex((:+)))
 
 import Haschoo.ScmValue (ScmValue(..))
 import Haschoo.Utils    (ErrOr, ($<), (.:))
@@ -69,12 +70,12 @@ scmMul xs = foldM go (ScmInt 1) xs
    go n x = if isNumeric x then liftScmNum2 (*) n x else notNum "*"
 
 scmDiv []     = tooFewArgs "/"
-scmDiv (x:xs) = foldM go (unint x) xs
+scmDiv (x:xs) = unint x >>= flip (foldM go) xs
  where
-   go n x = if isNumeric x then liftScmFrac2 (/) n (unint x) else notNum "/"
+   go n x = unint x >>= liftScmFrac2 (/) n
 
-   unint (ScmInt x) = ScmRat (fromInteger x)
-   unint x          = x
+   unint (ScmInt x) = Right $ ScmRat (fromInteger x)
+   unint x          = if isNumeric x then Right x else notNum "/"
 
 notNum, tooFewArgs, tooManyArgs :: String -> ErrOr a
 notNum      = fail . ("Nonnumeric argument to primitive procedure " ++)
