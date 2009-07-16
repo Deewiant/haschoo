@@ -34,6 +34,9 @@ primitives = map (\(a,b) -> (a, ScmFunc a b)) $
    , ("positive?", fmap ScmBool . scmIsPos)
    , ("negative?", fmap ScmBool . scmIsNeg)
 
+   , ("max", scmMax)
+   , ("min", scmMin)
+
    , ("+", scmPlus)
    , ("-", scmMinus)
    , ("*", scmMul)
@@ -95,6 +98,17 @@ scmIsPos _   = tooManyArgs "positive?"
 
 scmIsNeg [x] = scmCompare (<) "negative?" [x, ScmInt 0]
 scmIsNeg _   = tooManyArgs "negative?"
+
+scmMax, scmMin :: [ScmValue] -> ErrOr ScmValue
+scmMax []     = tooFewArgs "max"
+scmMax (x:xs) = if isNumeric x then foldM go x xs else notNum "max"
+ where
+   go n x = if isNumeric x then liftScmReal2 max n x else notNum "max"
+
+scmMin []     = tooFewArgs "min"
+scmMin (x:xs) = if isNumeric x then foldM go x xs else notNum "min"
+ where
+   go n x = if isNumeric x then liftScmReal2 min n x else notNum "min"
 
 ---- +-*/
 
@@ -184,6 +198,24 @@ liftScmFrac2 f (ScmReal    a) (ScmComplex b) = Right . ScmComplex$ f (a :+ 0) b
 liftScmFrac2 f (ScmComplex a) (ScmReal    b) = Right . ScmComplex$ f a (b :+ 0)
 
 liftScmFrac2 _ _ _ = fail "liftScmFrac2 :: internal error"
+
+liftScmReal2 :: (forall a. Real a => a -> a -> a)
+             -> (ScmValue -> ScmValue -> ErrOr ScmValue)
+liftScmReal2 f (ScmInt     a) (ScmInt     b) = Right . ScmInt    $ f a b
+liftScmReal2 f (ScmRat     a) (ScmRat     b) = Right . ScmRat    $ f a b
+liftScmReal2 f (ScmReal    a) (ScmReal    b) = Right . ScmReal   $ f a b
+
+-- Int+{Rat,Real}
+liftScmReal2 f (ScmInt     a) (ScmRat     b) = Right . ScmRat    $ f (fInt a) b
+liftScmReal2 f (ScmRat     a) (ScmInt     b) = Right . ScmRat    $ f a (fInt b)
+liftScmReal2 f (ScmInt     a) (ScmReal    b) = Right . ScmReal   $ f (fInt a) b
+liftScmReal2 f (ScmReal    a) (ScmInt     b) = Right . ScmReal   $ f a (fInt b)
+
+-- Rat+Real
+liftScmReal2 f (ScmRat     a) (ScmReal    b) = Right . ScmReal   $ f (fRat a) b
+liftScmReal2 f (ScmReal    a) (ScmRat     b) = Right . ScmReal   $ f a (fRat b)
+
+liftScmReal2 _ _ _ = fail "liftScmReal2 :: internal error"
 
 liftScmRealA2 :: (forall a. Real a => a -> a -> b)
               -> (ScmValue -> ScmValue -> ErrOr b)
