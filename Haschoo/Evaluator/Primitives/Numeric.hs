@@ -30,6 +30,10 @@ primitives = map (\(a,b) -> (a, ScmFunc a b)) $
    , "<=" $< id &&& fmap ScmBool .: scmCompare (<=)
    , ">=" $< id &&& fmap ScmBool .: scmCompare (>=)
 
+   , ("zero?",     fmap ScmBool . scmIsZero)
+   , ("positive?", fmap ScmBool . scmIsPos)
+   , ("negative?", fmap ScmBool . scmIsNeg)
+
    , ("+", scmPlus)
    , ("-", scmMinus)
    , ("*", scmMul)
@@ -75,6 +79,22 @@ scmCompare p s xs = allM f . (zip`ap`tail) $ xs
                   Left _ ->
                      fail$ "Nonreal argument to primitive procedure " ++ s
                   x      -> x
+
+scmIsZero :: [ScmValue] -> ErrOr Bool
+scmIsZero [ScmInt     0]    = Right True
+scmIsZero [ScmRat     0]    = Right True
+scmIsZero [ScmReal    0]    = Right True
+scmIsZero [ScmComplex 0]    = Right True
+scmIsZero [x] | isNumeric x = Right False
+scmIsZero [_]               = notNum "positive?"
+scmIsZero _                 = tooManyArgs "zero?"
+
+scmIsPos, scmIsNeg :: [ScmValue] -> ErrOr Bool
+scmIsPos [x] = scmCompare (>) "positive?" [x, ScmInt 0]
+scmIsPos _   = tooManyArgs "positive?"
+
+scmIsNeg [x] = scmCompare (<) "negative?" [x, ScmInt 0]
+scmIsNeg _   = tooManyArgs "negative?"
 
 ---- +-*/
 
