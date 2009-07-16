@@ -34,6 +34,8 @@ primitives = map (\(a,b) -> (a, ScmFunc a b)) $
    , ("zero?",     fmap ScmBool . scmIsZero)
    , ("positive?", fmap ScmBool . scmIsPos)
    , ("negative?", fmap ScmBool . scmIsNeg)
+   , "even?" $< id &&& fmap  ScmBool        .: scmIsEven
+   , "odd?"  $< id &&& fmap (ScmBool . not) .: scmIsEven
 
    , ("max", scmMax)
    , ("min", scmMin)
@@ -99,6 +101,12 @@ scmIsPos _   = tooManyArgs "positive?"
 
 scmIsNeg [x] = scmCompare (<) "negative?" [x, ScmInt 0]
 scmIsNeg _   = tooManyArgs "negative?"
+
+scmIsEven :: String -> [ScmValue] -> ErrOr Bool
+scmIsEven s [x] = if isInteger x
+                     then (scmIsZero.return) =<< scmMod [x, ScmInt 2]
+                     else notInt s
+scmIsEven s _   = tooManyArgs s
 
 scmMax, scmMin :: [ScmValue] -> ErrOr ScmValue
 scmMax []     = tooFewArgs "max"
