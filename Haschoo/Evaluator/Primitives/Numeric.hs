@@ -53,6 +53,11 @@ primitives = map (\(a,b) -> (a, ScmFunc a b)) $
 
    , ("numerator",   scmNumerator)
    , ("denominator", scmDenominator)
+
+   , ("floor",    scmFloor)
+   , ("ceiling",  scmCeil)
+   , ("truncate", scmTrunc)
+   , ("round",    scmRound)
    ]
 
 ---- Predicates
@@ -205,6 +210,23 @@ scmNumerDenom f s [x] =
 
 scmNumerDenom _ s [] = tooFewArgs s
 scmNumerDenom _ s _  = tooManyArgs s
+
+-- floor ceil trunc round
+
+scmFloor, scmCeil, scmTrunc, scmRound :: [ScmValue] -> ErrOr ScmValue
+scmFloor = scmGenericRound floor    "floor"
+scmCeil  = scmGenericRound ceiling  "ceiling"
+scmTrunc = scmGenericRound truncate "truncate"
+scmRound = scmGenericRound round    "round"
+
+scmGenericRound :: (forall a. RealFrac a => a -> Integer) -> String
+                -> [ScmValue] -> ErrOr ScmValue
+scmGenericRound _ _ [ScmInt     x] = Right . ScmInt                $ x
+scmGenericRound f _ [ScmRat     x] = Right . ScmInt                $ f x
+scmGenericRound f _ [ScmReal    x] = Right . ScmReal . fromInteger $ f x
+scmGenericRound _ s [_]            = notReal s
+scmGenericRound _ s []             = tooFewArgs s
+scmGenericRound _ s _              = tooManyArgs s
 
 -------------
 
