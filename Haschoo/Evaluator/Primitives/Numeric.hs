@@ -50,6 +50,9 @@ primitives = map (\(a,b) -> (a, ScmFunc a b)) $
 
    , ("gcd", scmGcd)
    , ("lcm", scmLcm)
+
+   , ("numerator",   scmNumerator)
+   , ("denominator", scmDenominator)
    ]
 
 ---- Predicates
@@ -184,12 +187,32 @@ scmGcdLcm f s = fmap fin . foldM go (True,0)
    go  (exact, n) = fmap ((exact &&) *** f n) . asInt s
    fin (exact, n) = if exact then ScmInt n else ScmReal (fromInteger n)
 
+-- numerator denominator
+
+scmNumerator, scmDenominator :: [ScmValue] -> ErrOr ScmValue
+scmNumerator   = scmNumerDenom numerator   "numerator"
+scmDenominator = scmNumerDenom denominator "denominator"
+
+scmNumerDenom :: (Rational -> Integer) -> String
+              -> [ScmValue] -> ErrOr ScmValue
+scmNumerDenom f s [x] =
+   case x of
+        ScmInt      x       -> Right . ScmInt  $ f (fromInteger x)
+        ScmRat      x       -> Right . ScmInt  $ f x
+        ScmReal     x       -> Right . ScmReal . fromInteger $ f (realToFrac x)
+        ScmComplex (x :+ 0) -> Right . ScmReal . fromInteger $ f (realToFrac x)
+        _                   -> notRat s
+
+scmNumerDenom _ s [] = tooFewArgs s
+scmNumerDenom _ s _  = tooManyArgs s
+
 -------------
 
-notInt, notNum, notReal, tooFewArgs, tooManyArgs :: String -> ErrOr a
+notInt, notNum, notReal, notRat, tooFewArgs, tooManyArgs :: String -> ErrOr a
 notInt      = fail . ("Noninteger argument to primitive procedure " ++)
 notNum      = fail . ("Nonnumeric argument to primitive procedure " ++)
 notReal     = fail . ("Nonreal argument to primitive procedure " ++)
+notRat      = fail . ("Nonrational argument to primitive procedure " ++)
 tooFewArgs  = fail . ("Too few arguments to primitive procedure " ++)
 tooManyArgs = fail . ("Too many arguments to primitive procedure " ++)
 
