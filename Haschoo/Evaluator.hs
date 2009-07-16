@@ -7,24 +7,26 @@ import qualified Data.ListTrie.Patricia.Map.Enum as TM
 
 import Haschoo.Datum             (Datum(..))
 import Haschoo.ScmValue          (ScmValue(..))
+import Haschoo.Utils             (ErrOr)
 import Haschoo.Evaluator.Context (Context(..))
 
-eval :: Context -> Datum -> ScmValue
-eval _   (Evaluated  v) = v
+eval :: Context -> Datum -> ErrOr ScmValue
+eval _   (Evaluated  v) = Right v
 eval ctx (UnevaledId s) =
    case TM.lookup s (idMap ctx) of
-        Nothing -> error $ "Unbound identifier " ++ s
+        Nothing -> fail $ "Unbound identifier " ++ s
         Just i  -> case IM.lookup i (valMap ctx) of
-                        Nothing -> error $ "Internal error looking up " ++ s
-                        Just v  -> v
+                        Nothing -> fail $ "Internal error looking up " ++ s
+                        Just v  -> Right v
 
 eval ctx (UnevaledApp xs) =
-   let es = map (eval ctx) xs
+   let es = mapM (eval ctx) xs
     in case es of
-            []                 -> error "Empty application"
-            (ScmFunc _ f : as) -> f as
-            _                  -> error "Can't apply non-function"
+            Left s                   -> fail s
+            Right []                 -> fail "Empty application"
+            Right (ScmFunc _ f : as) -> f as
+            Right _                  -> fail "Can't apply non-function"
 
-eval _ (Quoted      _)   = error "Can't eval quoted yet"
-eval _ (UnevaledVec _)   = error "Can't eval vector yet"
-eval _ (DottedList  _ _) = error "Can't eval dotted yet"
+eval _ (Quoted      _)   = fail "Can't eval quoted yet"
+eval _ (UnevaledVec _)   = fail "Can't eval vector yet"
+eval _ (DottedList  _ _) = fail "Can't eval dotted yet"

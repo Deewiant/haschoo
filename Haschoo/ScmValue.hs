@@ -6,9 +6,9 @@ import Data.Complex        (Complex((:+)))
 import Data.Ratio          (numerator, denominator)
 import Text.Show.Functions ()
 
-import Haschoo.Utils (showScmList)
+import Haschoo.Utils (ErrOr, showScmList)
 
-data ScmValue = ScmFunc    String ([ScmValue] -> ScmValue)
+data ScmValue = ScmFunc    String ([ScmValue] -> ErrOr ScmValue)
               | ScmBool    Bool
               | ScmChar    Char
               | ScmString  String

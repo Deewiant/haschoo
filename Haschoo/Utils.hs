@@ -2,7 +2,10 @@
 
 module Haschoo.Utils where
 
-import Data.List (intercalate)
+import Control.Monad.Error () -- Monad ErrOr
+import Data.List           (intercalate)
+
+type ErrOr = Either String
 
 swap :: (a,b) -> (b,a)
 swap ~(a,b) = (b,a)
