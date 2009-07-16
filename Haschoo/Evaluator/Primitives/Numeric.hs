@@ -118,8 +118,10 @@ scmPlus xs = foldM go (ScmInt 0) xs
  where
    go n x = if isNumeric x then liftScmNum2 (+) n x else notNum "+"
 
-scmMinus []     = tooFewArgs "-"
-scmMinus (x:xs) = if isNumeric x then foldM go x xs else notNum "-"
+scmMinus []                        = tooFewArgs "-"
+scmMinus (x:_) | not (isNumeric x) = notNum "-"
+scmMinus [x]                       = liftScmNum negate x
+scmMinus (x:xs)                    = foldM go x xs
  where
    go n x = if isNumeric x then liftScmNum2 (-) n x else notNum "-"
 
@@ -129,7 +131,10 @@ scmMul xs = foldM go (ScmInt 1) xs
    go n x = if isNumeric x then liftScmNum2 (*) n x else notNum "*"
 
 scmDiv []     = tooFewArgs "/"
-scmDiv (x:xs) = unint x >>= flip (foldM go) xs
+scmDiv (x:xs) =
+   unint x >>= case xs of
+                    []  -> liftScmFrac recip
+                    _:_ -> flip (foldM go) xs
  where
    go n x = unint x >>= liftScmFrac2 (/) n
 
@@ -154,6 +159,15 @@ isNumeric _              = False
 -- constructor of the two given
 --
 -- Ugly and verbose... too lazy to metaize these
+
+--- Num
+liftScmNum :: (forall a. Num a => a -> a) -> ScmValue -> ErrOr ScmValue
+liftScmNum f (ScmInt     a) = Right . ScmInt     $ f a
+liftScmNum f (ScmRat     a) = Right . ScmRat     $ f a
+liftScmNum f (ScmReal    a) = Right . ScmReal    $ f a
+liftScmNum f (ScmComplex a) = Right . ScmComplex $ f a
+liftScmNum _ _ = fail "liftScmNum :: internal error"
+
 liftScmNum2 :: (forall a. Num a => a -> a -> a)
             -> (ScmValue -> ScmValue -> ErrOr ScmValue)
 liftScmNum2 f (ScmInt     a) (ScmInt     b) = Right . ScmInt    $ f a b
@@ -181,6 +195,13 @@ liftScmNum2 f (ScmComplex a) (ScmReal    b) = Right . ScmComplex$ f a (b :+ 0)
 
 liftScmNum2 _ _ _ = fail "liftScmNum2 :: internal error"
 
+--- Frac
+liftScmFrac :: (forall a. Fractional a => a -> a) -> ScmValue -> ErrOr ScmValue
+liftScmFrac f (ScmRat     a) = Right . ScmRat     $ f a
+liftScmFrac f (ScmReal    a) = Right . ScmReal    $ f a
+liftScmFrac f (ScmComplex a) = Right . ScmComplex $ f a
+liftScmFrac _ _ = fail "liftScmFrac :: internal error"
+
 liftScmFrac2 :: (forall a. Fractional a => a -> a -> a)
              -> (ScmValue -> ScmValue -> ErrOr ScmValue)
 liftScmFrac2 f (ScmRat     a) (ScmRat     b) = Right . ScmRat    $ f a b
@@ -199,6 +220,7 @@ liftScmFrac2 f (ScmComplex a) (ScmReal    b) = Right . ScmComplex$ f a (b :+ 0)
 
 liftScmFrac2 _ _ _ = fail "liftScmFrac2 :: internal error"
 
+--- Real
 liftScmReal2 :: (forall a. Real a => a -> a -> a)
              -> (ScmValue -> ScmValue -> ErrOr ScmValue)
 liftScmReal2 f (ScmInt     a) (ScmInt     b) = Right . ScmInt    $ f a b
