@@ -8,15 +8,15 @@ import Text.Show.Functions ()
 
 import Haschoo.Utils (ErrOr, showScmList)
 
-data ScmValue = ScmFunc    String ([ScmValue] -> ErrOr ScmValue)
-              | ScmBool    Bool
-              | ScmChar    Char
-              | ScmString  String
-              | ScmInt     Integer
-              | ScmRat     Rational
-              | ScmReal    Double
-              | ScmComplex (Complex Double)
-              | ScmList    [ScmValue]
+data ScmValue = ScmFunc    String !([ScmValue] -> ErrOr ScmValue)
+              | ScmBool    !Bool
+              | ScmChar    !Char
+              | ScmString  !String
+              | ScmInt     !Integer
+              | ScmRat     !Rational
+              | ScmReal    !Double
+              | ScmComplex !(Complex Double)
+              | ScmList    ![ScmValue]
  deriving Show
 
 scmShow :: ScmValue -> String
