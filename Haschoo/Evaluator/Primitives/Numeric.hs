@@ -8,6 +8,7 @@ import Control.Applicative ((<$>))
 import Control.Arrow       ((&&&))
 import Control.Monad       (ap, foldM)
 import Data.Complex        (Complex((:+)), imagPart, realPart)
+import Data.Ratio          (numerator, denominator)
 import Data.Function       (on)
 
 import Haschoo.ScmValue (ScmValue(..))
@@ -41,6 +42,10 @@ primitives = map (\(a,b) -> (a, ScmFunc a b)) $
    , ("-", scmMinus)
    , ("*", scmMul)
    , ("/", scmDiv)
+
+   , ("quotient",  scmQuot)
+   , ("remainder", scmRem)
+   , ("modulo",    scmMod)
    ]
 
 ---- Predicates
@@ -57,12 +62,8 @@ scmIsRational [ScmRat _] = Right True
 scmIsRational [_]        = Right False
 scmIsRational _          = tooManyArgs "rational?"
 
-scmIsInteger [ScmInt     _]      = Right True
-scmIsInteger [ScmRat     x]      = Right $ x == fromInteger (round x)
-scmIsInteger [ScmReal    x]      = Right $ x == fromInteger (round x)
-scmIsInteger [ScmComplex (a:+b)] = Right $ b == 0 && a == fromInteger (round a)
-scmIsInteger [_]                 = Right False
-scmIsInteger _                   = tooManyArgs "integer?"
+scmIsInteger [x] = Right $ isInteger x
+scmIsInteger _   = tooManyArgs "integer?"
 
 scmIsExact :: String -> [ScmValue] -> ErrOr Bool
 scmIsExact _ [ScmInt _]        = Right True
@@ -141,17 +142,49 @@ scmDiv (x:xs) =
    unint (ScmInt x) = Right $ ScmRat (fromInteger x)
    unint x          = if isNumeric x then Right x else notNum "/"
 
-notNum, tooFewArgs, tooManyArgs :: String -> ErrOr a
+---- quot rem mod
+
+scmQuot, scmRem, scmMod :: [ScmValue] -> ErrOr ScmValue
+scmQuot = scmQuotRemMod quot "quotient"
+scmRem  = scmQuotRemMod rem "remainder"
+scmMod  = scmQuotRemMod mod "modulo"
+
+scmQuotRemMod :: (Integer -> Integer -> Integer) -> String
+              -> [ScmValue] -> ErrOr ScmValue
+scmQuotRemMod f s [x,y] = do
+   (e1,a) <- asInt s x
+   (e2,b) <- asInt s y
+   return . (if e1 && e2 then ScmInt else ScmReal . fromInteger) $ f a b
+scmQuotRemMod _ s (_:_:_) = tooManyArgs s
+scmQuotRemMod _ s _       = tooFewArgs  s
+
+-------------
+
+notInt, notNum, tooFewArgs, tooManyArgs :: String -> ErrOr a
+notInt      = fail . ("Noninteger argument to primitive procedure " ++)
 notNum      = fail . ("Nonnumeric argument to primitive procedure " ++)
 tooFewArgs  = fail . ("Too few arguments to primitive procedure " ++)
 tooManyArgs = fail . ("Too many arguments to primitive procedure " ++)
 
-isNumeric :: ScmValue -> Bool
+isNumeric, isInteger :: ScmValue -> Bool
 isNumeric (ScmInt     _) = True
 isNumeric (ScmRat     _) = True
 isNumeric (ScmReal    _) = True
 isNumeric (ScmComplex _) = True
 isNumeric _              = False
+
+isInteger (ScmInt     _)      = True
+isInteger (ScmRat     x)      = denominator x == 1
+isInteger (ScmReal    x)      = x == fromInteger (round x)
+isInteger (ScmComplex (a:+b)) = b == 0 && a == fromInteger (round a)
+isInteger _                   = False
+
+asInt :: String -> ScmValue -> ErrOr (Bool, Integer)
+asInt s x | not (isInteger x) = notInt s
+asInt _ (ScmInt     x)        = Right (True,  x)
+asInt _ (ScmRat     x)        = Right (True,  numerator x)
+asInt _ (ScmReal    x)        = Right (False, round x)
+asInt _ (ScmComplex (x:+0))   = Right (False, round x)
 
 -- Lift ScmValue's numeric types to a common type
 --
