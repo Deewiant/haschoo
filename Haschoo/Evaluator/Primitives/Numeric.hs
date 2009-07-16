@@ -5,7 +5,7 @@
 module Haschoo.Evaluator.Primitives.Numeric (primitives) where
 
 import Control.Applicative ((<$>))
-import Control.Arrow       ((&&&))
+import Control.Arrow       ((&&&), (***))
 import Control.Monad       (ap, foldM)
 import Data.Complex        (Complex((:+)), imagPart, realPart)
 import Data.Ratio          (numerator, denominator)
@@ -48,6 +48,9 @@ primitives = map (\(a,b) -> (a, ScmFunc a b)) $
    , ("quotient",  scmQuot)
    , ("remainder", scmRem)
    , ("modulo",    scmMod)
+
+   , ("gcd", scmGcd)
+   , ("lcm", scmLcm)
    ]
 
 ---- Predicates
@@ -165,6 +168,19 @@ scmQuotRemMod f s [x,y] = do
    return . (if e1 && e2 then ScmInt else ScmReal . fromInteger) $ f a b
 scmQuotRemMod _ s (_:_:_) = tooManyArgs s
 scmQuotRemMod _ s _       = tooFewArgs  s
+
+-- gcd lcm
+
+scmGcd, scmLcm :: [ScmValue] -> ErrOr ScmValue
+scmGcd = scmGcdLcm gcd "gcd"
+scmLcm = scmGcdLcm lcm "lcm"
+
+scmGcdLcm :: (Integer -> Integer -> Integer) -> String
+          -> [ScmValue] -> ErrOr ScmValue
+scmGcdLcm f s = fmap fin . foldM go (True,0)
+ where
+   go  (exact, n) = fmap ((exact &&) *** f n) . asInt s
+   fin (exact, n) = if exact then ScmInt n else ScmReal (fromInteger n)
 
 -------------
 
