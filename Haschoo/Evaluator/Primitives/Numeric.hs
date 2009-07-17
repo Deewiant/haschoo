@@ -69,6 +69,9 @@ primitives = map (\(a,b) -> (a, ScmFunc a b)) $
    , ("asin", scmAsin)
    , ("acos", scmAcos)
    , ("atan", scmAtan)
+
+   , ("sqrt", scmSqrt)
+   , ("expt", scmExpt)
    ]
 
 ---- Predicates
@@ -251,10 +254,12 @@ scmRationalize [x,y]     =
 
 scmRationalize _         = tooFewArgs "rationalize"
 
--- exp log sin cos tan asin acos atan
+-- exp log sin cos tan asin acos atan sqrt
 
-scmExp,  scmLog, scmSin,  scmCos,  scmTan,
-                 scmAsin, scmAcos, scmAtan :: [ScmValue] -> ErrOr ScmValue
+scmExp, scmLog,
+ scmSin,  scmCos,  scmTan,
+ scmAsin, scmAcos, scmAtan,
+ scmSqrt :: [ScmValue] -> ErrOr ScmValue
 
 scmExp  = scmComplex1 exp  "exp"
 scmLog  = scmComplex1 log  "log"
@@ -276,6 +281,8 @@ scmAtan [y,x] =
 
 scmAtan xs    = scmComplex1 atan "atan" xs
 
+scmSqrt = scmComplex1 sqrt "sqrt"
+
 scmComplex1 :: (Complex Double -> Complex Double) -> String
             -> [ScmValue] -> ErrOr ScmValue
 scmComplex1 f _ [ScmInt     x] = Right . fromComplex $ f (fromInteger  x :+ 0)
@@ -285,6 +292,22 @@ scmComplex1 f _ [ScmComplex x] = Right . fromComplex $ f x
 scmComplex1 _ s [_]            = notNum s
 scmComplex1 _ s []             = tooFewArgs s
 scmComplex1 _ s _              = tooManyArgs s
+
+-- expt
+
+scmExpt :: [ScmValue] -> ErrOr ScmValue
+scmExpt [x,y] =
+   case pairScmComplex x y of
+        Left _                              -> notNum "expt"
+        Right (ScmInt     a, ScmInt      b) -> Right . ScmInt     $ a ^ b
+        Right (ScmReal    a, ScmReal     b) -> Right . ScmReal    $ a ** b
+        Right (ScmComplex a, ScmComplex  b) -> Right . ScmComplex $ a ** b
+        Right (ScmRat     a, ScmRat      b) ->
+           Right . ScmReal $ fromRational a ** fromRational b
+        Right _                             -> error "expt :: internal error"
+
+scmExpt (_:_:_) = tooManyArgs "expt"
+scmExpt _       = tooFewArgs  "expt"
 
 -------------
 
@@ -458,6 +481,42 @@ pairScmReal (ScmComplex a) (ScmReal    b) =
    Right $ ((,)`on`ScmReal) (realPart a) b
 
 pairScmReal _ _ = fail "pairScmReal :: internal error"
+
+pairScmComplex :: ScmValue -> ScmValue -> ErrOr (ScmValue, ScmValue)
+pairScmComplex a@(ScmInt     _) b@(ScmInt     _) = Right $ (a,b)
+pairScmComplex a@(ScmRat     _) b@(ScmRat     _) = Right $ (a,b)
+pairScmComplex a@(ScmReal    _) b@(ScmReal    _) = Right $ (a,b)
+pairScmComplex a@(ScmComplex _) b@(ScmComplex _) = Right $ (a,b)
+
+-- Int+{Rat,Real,Complex}
+pairScmComplex (ScmInt     a) (ScmRat     b) = Right$((,)`on`ScmRat) (fInt a) b
+pairScmComplex (ScmRat     a) (ScmInt     b) = Right$((,)`on`ScmRat) a (fInt b)
+pairScmComplex (ScmInt     a) (ScmReal    b) =
+   Right $ ((,)`on`ScmReal) (fInt a) b
+pairScmComplex (ScmReal    a) (ScmInt     b) =
+   Right $ ((,)`on`ScmReal) a (fInt b)
+pairScmComplex (ScmInt     a) (ScmComplex b) =
+   Right $ ((,)`on`ScmComplex) (fInt a) b
+pairScmComplex (ScmComplex a) (ScmInt     b) =
+   Right $ ((,)`on`ScmComplex) a (fInt b)
+
+-- Rat+{Real,Complex}
+pairScmComplex (ScmRat     a) (ScmReal    b) =
+   Right $ ((,)`on`ScmReal) (fRat a) b
+pairScmComplex (ScmReal    a) (ScmRat     b) =
+   Right $ ((,)`on`ScmReal) a (fRat b)
+pairScmComplex (ScmRat     a) (ScmComplex b) =
+   Right $ ((,)`on`ScmComplex) (fRat a) b
+pairScmComplex (ScmComplex a) (ScmRat     b) =
+   Right $ ((,)`on`ScmComplex) a (fRat b)
+
+-- Real+Complex
+pairScmComplex (ScmReal    a) (ScmComplex b) =
+   Right $ ((,)`on`ScmComplex) (a:+0) b
+pairScmComplex (ScmComplex a) (ScmReal    b) =
+   Right $ ((,)`on`ScmComplex) a (b:+0)
+
+pairScmComplex _ _ = fail "pairScmComplex :: internal error"
 
 fInt :: Num a => Integer -> a
 fInt = fromInteger
