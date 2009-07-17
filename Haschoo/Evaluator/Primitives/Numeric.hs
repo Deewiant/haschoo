@@ -7,7 +7,7 @@ module Haschoo.Evaluator.Primitives.Numeric (primitives) where
 import Control.Arrow       ((&&&), (***))
 import Control.Monad       (ap, foldM)
 import Data.Complex        (Complex((:+)), imagPart, realPart)
-import Data.Ratio          (numerator, denominator)
+import Data.Ratio          (numerator, denominator, approxRational)
 import Data.Function       (on)
 
 import Haschoo.ScmValue (ScmValue(..))
@@ -58,6 +58,8 @@ primitives = map (\(a,b) -> (a, ScmFunc a b)) $
    , ("ceiling",  scmCeil)
    , ("truncate", scmTrunc)
    , ("round",    scmRound)
+
+   , ("rationalize", scmRationalize)
    ]
 
 ---- Predicates
@@ -228,6 +230,18 @@ scmGenericRound _ s [_]            = notReal s
 scmGenericRound _ s []             = tooFewArgs s
 scmGenericRound _ s _              = tooManyArgs s
 
+-- rationalize
+
+scmRationalize :: [ScmValue] -> ErrOr ScmValue
+scmRationalize (_:_:_:_) = tooManyArgs "rationalize"
+scmRationalize [x,y]     =
+   case liftScmRealFracB2 approxRational x y of
+        Left _           -> notReal "rationalize"
+        Right (True , n) -> Right (ScmRat  n)
+        Right (False, n) -> Right (ScmReal (fromRational n))
+
+scmRationalize _         = tooFewArgs "rationalize"
+
 -------------
 
 notInt, notNum, notReal, notRat, tooFewArgs, tooManyArgs :: String -> ErrOr a
@@ -262,7 +276,8 @@ asInt _ _                     = error "This can't happen"
 -- Lift ScmValue's numeric types to a common type
 --
 -- Versions without 'A' at the end also return results in the correct
--- constructor of the two given
+-- constructor of the two given. Versions with 'B' just return whether the
+-- result should be exact or not.
 --
 -- Ugly and verbose... too lazy to metaize these
 
@@ -399,6 +414,48 @@ liftScmRealA2 f (ScmReal    a) (ScmComplex b) = Right $ f a (realPart b)
 liftScmRealA2 f (ScmComplex a) (ScmReal    b) = Right $ f (realPart a) b
 
 liftScmRealA2 _ _ _ = fail "liftScmRealA2 :: internal error"
+
+--- RealFrac
+liftScmRealFracB2 :: (forall a. RealFrac a => a -> a -> b)
+                  -> (ScmValue -> ScmValue -> ErrOr (Bool, b))
+liftScmRealFracB2 _ (ScmComplex a) _ | imagPart a /= 0 =
+   fail "liftScmRealFracB2 :: complex"
+
+liftScmRealFracB2 _ _ (ScmComplex b) | imagPart b /= 0 =
+   fail "liftScmRealFracB2 :: complex"
+
+liftScmRealFracB2 f (ScmInt     a) (ScmInt     b) =
+   Right $ (True, f (fInt a :: Rational) (fInt b))
+liftScmRealFracB2 f (ScmRat     a) (ScmRat     b) = Right $ (True,  f a b)
+liftScmRealFracB2 f (ScmReal    a) (ScmReal    b) = Right $ (False, f a b)
+liftScmRealFracB2 f (ScmComplex a) (ScmComplex b) =
+   Right $ (False, (f `on` realPart) a b)
+
+-- Int+{Rat,Real,Complex}
+liftScmRealFracB2 f (ScmInt     a) (ScmRat     b) = Right$ (True, f (fInt a) b)
+liftScmRealFracB2 f (ScmRat     a) (ScmInt     b) = Right$ (True, f a (fInt b))
+liftScmRealFracB2 f (ScmInt     a) (ScmReal    b) = Right$ (False,f (fInt a) b)
+liftScmRealFracB2 f (ScmReal    a) (ScmInt     b) = Right$ (False,f a (fInt b))
+liftScmRealFracB2 f (ScmInt     a) (ScmComplex b) =
+   Right $ (False, f (fInt a) (realPart b))
+liftScmRealFracB2 f (ScmComplex a) (ScmInt     b) =
+   Right $ (False, f (realPart a) (fInt b))
+
+-- Rat+{Real,Complex}
+liftScmRealFracB2 f (ScmRat     a) (ScmReal    b) = Right$ (False,f (fRat a) b)
+liftScmRealFracB2 f (ScmReal    a) (ScmRat     b) = Right$ (False,f a (fRat b))
+liftScmRealFracB2 f (ScmRat     a) (ScmComplex b) =
+   Right $ (False, f (fRat a) (realPart b))
+liftScmRealFracB2 f (ScmComplex a) (ScmRat     b) =
+   Right $ (False, f (realPart a) (fRat b))
+
+-- Real+Complex
+liftScmRealFracB2 f (ScmReal    a) (ScmComplex b) =
+   Right $ (False, f a (realPart b))
+liftScmRealFracB2 f (ScmComplex a) (ScmReal    b) =
+   Right $ (False, f (realPart a) b)
+
+liftScmRealFracB2 _ _ _ = fail "liftScmRealFracB2 :: internal error"
 
 fInt :: Num a => Integer -> a
 fInt = fromInteger
