@@ -6,7 +6,7 @@ module Haschoo.Evaluator.Primitives.Numeric (primitives) where
 
 import Control.Arrow       ((&&&), (***))
 import Control.Monad       (ap, foldM)
-import Data.Complex        (Complex((:+)), imagPart, realPart)
+import Data.Complex        (Complex((:+)), imagPart, realPart, phase)
 import Data.Ratio          (numerator, denominator, approxRational)
 import Data.Function       (on)
 
@@ -60,6 +60,15 @@ primitives = map (\(a,b) -> (a, ScmFunc a b)) $
    , ("round",    scmRound)
 
    , ("rationalize", scmRationalize)
+
+   , ("exp",  scmExp)
+   , ("log",  scmLog)
+   , ("sin",  scmSin)
+   , ("cos",  scmCos)
+   , ("tan",  scmTan)
+   , ("asin", scmAsin)
+   , ("acos", scmAcos)
+   , ("atan", scmAtan)
    ]
 
 ---- Predicates
@@ -242,6 +251,41 @@ scmRationalize [x,y]     =
 
 scmRationalize _         = tooFewArgs "rationalize"
 
+-- exp log sin cos tan asin acos atan
+
+scmExp,  scmLog, scmSin,  scmCos,  scmTan,
+                 scmAsin, scmAcos, scmAtan :: [ScmValue] -> ErrOr ScmValue
+
+scmExp  = scmComplex1 exp  "exp"
+scmLog  = scmComplex1 log  "log"
+scmSin  = scmComplex1 sin  "sin"
+scmCos  = scmComplex1 cos  "cos"
+scmTan  = scmComplex1 tan  "tan"
+scmAsin = scmComplex1 asin "asin"
+scmAcos = scmComplex1 acos "acos"
+
+scmAtan [y,x] =
+   case pairScmReal x y of
+        Left  _                      -> notReal "atan"
+        Right (ScmReal a, ScmReal b) -> Right (ScmReal $ phase $ a :+ b)
+        Right (ScmInt a, ScmInt b)   ->
+           Right (ScmReal $ phase $ fromInteger a :+ fromInteger b)
+        Right (ScmRat a, ScmRat b)   ->
+           Right (ScmReal $ phase $ fromRational a :+ fromRational b)
+        Right _                      -> error "scmAtan :: internal error"
+
+scmAtan xs    = scmComplex1 atan "atan" xs
+
+scmComplex1 :: (Complex Double -> Complex Double) -> String
+            -> [ScmValue] -> ErrOr ScmValue
+scmComplex1 f _ [ScmInt     x] = Right . fromComplex $ f (fromInteger  x :+ 0)
+scmComplex1 f _ [ScmRat     x] = Right . fromComplex $ f (fromRational x :+ 0)
+scmComplex1 f _ [ScmReal    x] = Right . fromComplex $ f (x :+ 0)
+scmComplex1 f _ [ScmComplex x] = Right . fromComplex $ f x
+scmComplex1 _ s [_]            = notNum s
+scmComplex1 _ s []             = tooFewArgs s
+scmComplex1 _ s _              = tooManyArgs s
+
 -------------
 
 notInt, notNum, notReal, notRat, tooFewArgs, tooManyArgs :: String -> ErrOr a
@@ -272,6 +316,10 @@ asInt _ (ScmRat     x)        = Right (True,  numerator x)
 asInt _ (ScmReal    x)        = Right (False, round x)
 asInt _ (ScmComplex (x:+0))   = Right (False, round x)
 asInt _ _                     = error "This can't happen"
+
+fromComplex :: Complex Double -> ScmValue
+fromComplex (x :+ 0) = ScmReal x
+fromComplex x        = ScmComplex x
 
 -- Lift ScmValue's numeric types to a common type
 --
@@ -456,6 +504,42 @@ liftScmRealFracB2 f (ScmComplex a) (ScmReal    b) =
    Right $ (False, f (realPart a) b)
 
 liftScmRealFracB2 _ _ _ = fail "liftScmRealFracB2 :: internal error"
+
+pairScmReal :: ScmValue -> ScmValue -> ErrOr (ScmValue, ScmValue)
+pairScmReal (ScmComplex a) _ | imagPart a /= 0 = fail "pairScmReal :: complex"
+pairScmReal _ (ScmComplex b) | imagPart b /= 0 = fail "pairScmReal :: complex"
+
+pairScmReal a@(ScmInt     _) b@(ScmInt     _) = Right $ (a,b)
+pairScmReal a@(ScmRat     _) b@(ScmRat     _) = Right $ (a,b)
+pairScmReal a@(ScmReal    _) b@(ScmReal    _) = Right $ (a,b)
+pairScmReal   (ScmComplex a)   (ScmComplex b) =
+   Right $ ((,) `on` ScmReal . realPart) a b
+
+-- Int+{Rat,Real,Complex}
+pairScmReal (ScmInt     a) (ScmRat     b) = Right $ ((,)`on`ScmRat)  (fInt a) b
+pairScmReal (ScmRat     a) (ScmInt     b) = Right $ ((,)`on`ScmRat)  a (fInt b)
+pairScmReal (ScmInt     a) (ScmReal    b) = Right $ ((,)`on`ScmReal) (fInt a) b
+pairScmReal (ScmReal    a) (ScmInt     b) = Right $ ((,)`on`ScmReal) a (fInt b)
+pairScmReal (ScmInt     a) (ScmComplex b) =
+   Right $ ((,)`on`ScmReal) (fInt a) (realPart b)
+pairScmReal (ScmComplex a) (ScmInt     b) =
+   Right $ ((,)`on`ScmReal) (realPart a) (fInt b)
+
+-- Rat+{Real,Complex}
+pairScmReal (ScmRat     a) (ScmReal    b) = Right $ ((,)`on`ScmReal) (fRat a) b
+pairScmReal (ScmReal    a) (ScmRat     b) = Right $ ((,)`on`ScmReal) a (fRat b)
+pairScmReal (ScmRat     a) (ScmComplex b) =
+   Right $ ((,)`on`ScmReal) (fRat a) (realPart b)
+pairScmReal (ScmComplex a) (ScmRat     b) =
+   Right $ ((,)`on`ScmReal) (realPart a) (fRat b)
+
+-- Real+Complex
+pairScmReal (ScmReal    a) (ScmComplex b) =
+   Right $ ((,)`on`ScmReal) a (realPart b)
+pairScmReal (ScmComplex a) (ScmReal    b) =
+   Right $ ((,)`on`ScmReal) (realPart a) b
+
+pairScmReal _ _ = fail "pairScmReal :: internal error"
 
 fInt :: Num a => Integer -> a
 fInt = fromInteger
