@@ -73,7 +73,9 @@ quotedString :: Parser Char ScmValue
 quotedString =
    ScmString <$>
       (join bracket (one '"') . many $
-         oneOf [one '\\' >> commit (pElem "\\\""), pNotElem "\\\""])
+         oneOf [ one '\\' >> commit (pElem "\\\"")
+                                `usingError` "Invalid escaped character"
+               , satisfy (/= '"') ])
 
 list :: Parser Char Datum
 list =
