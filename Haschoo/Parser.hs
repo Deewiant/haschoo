@@ -184,7 +184,10 @@ number = do
                        , do a <- uint radix
                             b <- optional $ one '/' >> uint radix
                             case b of
-                                 Nothing -> tryExponent a
+                                 Nothing ->
+                                    if radix == 10
+                                       then tryExponent a
+                                       else return a
                                  Just n  -> return (mkRatio a n) ]
 
    mkRatio (ScmInt a) (ScmInt b) = ScmRat (a % b)
