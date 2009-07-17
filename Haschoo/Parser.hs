@@ -4,7 +4,7 @@ module Haschoo.Parser (parser) where
 
 import Control.Applicative ((<$>))
 import Control.Monad (join)
-import Data.Char (digitToInt, isDigit, isHexDigit, isOctDigit)
+import Data.Char (digitToInt, isDigit, isHexDigit, isOctDigit, isSpace)
 import Data.Complex (Complex((:+)), mkPolar)
 import Data.Maybe (fromJust, fromMaybe, isJust)
 import Data.Ratio ((%))
@@ -252,12 +252,12 @@ atmosphere = void $ many whitespaceOrComment
 
 whitespaceOrComment :: Parser Char ()
 whitespaceOrComment =
-   oneOf [ void $ one ' '
-         , void newline
+   oneOf [ void newline
+         , void (satisfy isSpace)
          , void comment ]
  where
-   newline    = oneOf [ void $ one '\n'
-                      , void $ one '\r' >> optional (one '\n') ]
+   newline = oneOf [ void $ one '\n'
+                   , void $ one '\r' >> optional (one '\n') ]
    comment = void $ do
       one ';'
       commit (many notNewline >> (void newline `onFail` return ()))
