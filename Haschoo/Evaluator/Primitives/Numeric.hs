@@ -80,6 +80,9 @@ primitives = map (\(a,b) -> (a, ScmFunc a b)) $
    , ("imag-part",        scmImagPart)
    , ("magnitude",        scmNorm)
    , ("angle",            scmAngle)
+
+   , ("exact->inexact", scmToInexact)
+   , ("inexact->exact", scmToExact)
    ]
 
 ---- Predicates
@@ -352,6 +355,31 @@ scmComplexPart _ _ [x] | isNumeric x = Right x
 scmComplexPart _ s [_]               = notNum s
 scmComplexPart _ s []                = tooFewArgs s
 scmComplexPart _ s _                 = tooManyArgs s
+
+---- exact->inexact inexact->exact
+
+scmToInexact, scmToExact :: [ScmValue] -> ErrOr ScmValue
+scmToInexact [ScmInt x]         = Right $ ScmReal (fromInteger  x)
+scmToInexact [ScmRat x]         = Right $ ScmReal (fromRational x)
+scmToInexact [x] | isNumeric x  = Right x
+scmToInexact [_]                = notNum      "exact->inexact"
+scmToInexact []                 = tooFewArgs  "exact->inexact"
+scmToInexact _                  = tooManyArgs "exact->inexact"
+
+scmToExact [ScmReal    x]     =
+   let r = toRational x
+    in Right $ if denominator r == 1
+                  then ScmInt (numerator r)
+                  else ScmRat r
+scmToExact [ScmComplex x]     =
+   case imagPart x of
+        0 -> Right $ ScmReal (realPart x)
+        _ -> fail $ "inexact->exact :: implementation restriction: " ++
+                    "can't exactify complex numbers"
+scmToExact [x] | isNumeric x  = Right x
+scmToExact [_]                = notNum      "exact->inexact"
+scmToExact []                 = tooFewArgs  "exact->inexact"
+scmToExact _                  = tooManyArgs "exact->inexact"
 
 -------------
 
