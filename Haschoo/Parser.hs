@@ -79,7 +79,7 @@ list =
             atmosphere
             dot <- optional (one '.')
             if isJust dot
-               then DottedList dats <$> commit datum
+               then DottedList dats <$> (commit atmosphere >> datum)
                else return$ UnevaledApp dats
 
 vector :: Parser Char Datum
