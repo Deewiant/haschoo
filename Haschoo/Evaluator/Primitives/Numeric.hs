@@ -327,7 +327,7 @@ fromComplex x        = ScmComplex x
 -- constructor of the two given. Versions with 'B' just return whether the
 -- result should be exact or not.
 --
--- Ugly and verbose... too lazy to metaize these
+-- Ugly and verbose... too lazy to metaize these {{{
 
 --- Num
 liftScmNum :: (forall a. Num a => a -> a) -> ScmValue -> ErrOr ScmValue
@@ -392,118 +392,36 @@ liftScmFrac2 _ _ _ = fail "liftScmFrac2 :: internal error"
 --- Real
 liftScmReal2 :: (forall a. Real a => a -> a -> a)
              -> (ScmValue -> ScmValue -> ErrOr ScmValue)
-liftScmReal2 _ (ScmComplex a) _ | imagPart a /= 0 =
-   fail "liftScmReal2 :: complex"
-
-liftScmReal2 _ _ (ScmComplex b) | imagPart b /= 0 =
-   fail "liftScmReal2 :: complex"
-
-liftScmReal2 f (ScmInt     a) (ScmInt     b) = Right . ScmInt  $ f a b
-liftScmReal2 f (ScmRat     a) (ScmRat     b) = Right . ScmRat  $ f a b
-liftScmReal2 f (ScmReal    a) (ScmReal    b) = Right . ScmReal $ f a b
-liftScmReal2 f (ScmComplex a) (ScmComplex b) =
-   Right . ScmReal $ (f `on` realPart) a b
-
--- Int+{Rat,Real,Complex}
-liftScmReal2 f (ScmInt     a) (ScmRat     b) = Right . ScmRat  $ f (fInt a) b
-liftScmReal2 f (ScmRat     a) (ScmInt     b) = Right . ScmRat  $ f a (fInt b)
-liftScmReal2 f (ScmInt     a) (ScmReal    b) = Right . ScmReal $ f (fInt a) b
-liftScmReal2 f (ScmReal    a) (ScmInt     b) = Right . ScmReal $ f a (fInt b)
-liftScmReal2 f (ScmInt     a) (ScmComplex b) =
-   Right . ScmReal $ f (fInt a) (realPart b)
-liftScmReal2 f (ScmComplex a) (ScmInt     b) =
-   Right . ScmReal $ f (realPart a) (fInt b)
-
--- Rat+{Real,Complex}
-liftScmReal2 f (ScmRat     a) (ScmReal    b) = Right . ScmReal $ f (fRat a) b
-liftScmReal2 f (ScmReal    a) (ScmRat     b) = Right . ScmReal $ f a (fRat b)
-liftScmReal2 f (ScmRat     a) (ScmComplex b) =
-   Right . ScmReal $ f (fRat a) (realPart b)
-liftScmReal2 f (ScmComplex a) (ScmRat     b) =
-   Right . ScmReal $ f (realPart a) (fRat b)
-
--- Real+Complex
-liftScmReal2 f (ScmReal    a) (ScmComplex b) =
-   Right . ScmReal $ f a (realPart b)
-liftScmReal2 f (ScmComplex a) (ScmReal    b) =
-   Right . ScmReal $ f (realPart a) b
-
-liftScmReal2 _ _ _ = fail "liftScmReal2 :: internal error"
+liftScmReal2 f x y =
+   case pairScmReal x y of
+        Right (ScmReal a, ScmReal b) -> Right . ScmReal $ f a b
+        Right (ScmRat  a, ScmRat  b) -> Right . ScmRat  $ f a b
+        Right (ScmInt  a, ScmInt  b) -> Right . ScmInt  $ f a b
+        Left s                       -> Left s
+        Right _                      -> fail "liftScmReal2 :: internal error"
 
 liftScmRealA2 :: (forall a. Real a => a -> a -> b)
               -> (ScmValue -> ScmValue -> ErrOr b)
-liftScmRealA2 _ (ScmComplex a) _ | imagPart a /= 0 =
-   fail "liftScmRealA2 :: complex"
-
-liftScmRealA2 _ _ (ScmComplex b) | imagPart b /= 0 =
-   fail "liftScmRealA2 :: complex"
-
-liftScmRealA2 f (ScmInt     a) (ScmInt     b) = Right $ f a b
-liftScmRealA2 f (ScmRat     a) (ScmRat     b) = Right $ f a b
-liftScmRealA2 f (ScmReal    a) (ScmReal    b) = Right $ f a b
-liftScmRealA2 f (ScmComplex a) (ScmComplex b) = Right $ (f `on` realPart) a b
-
--- Int+{Rat,Real,Complex}
-liftScmRealA2 f (ScmInt     a) (ScmRat     b) = Right $ f (fInt a) b
-liftScmRealA2 f (ScmRat     a) (ScmInt     b) = Right $ f a (fInt b)
-liftScmRealA2 f (ScmInt     a) (ScmReal    b) = Right $ f (fInt a) b
-liftScmRealA2 f (ScmReal    a) (ScmInt     b) = Right $ f a (fInt b)
-liftScmRealA2 f (ScmInt     a) (ScmComplex b) = Right $ f (fInt a) (realPart b)
-liftScmRealA2 f (ScmComplex a) (ScmInt     b) = Right $ f (realPart a) (fInt b)
-
--- Rat+{Real,Complex}
-liftScmRealA2 f (ScmRat     a) (ScmReal    b) = Right $ f (fRat a) b
-liftScmRealA2 f (ScmReal    a) (ScmRat     b) = Right $ f a (fRat b)
-liftScmRealA2 f (ScmRat     a) (ScmComplex b) = Right $ f (fRat a) (realPart b)
-liftScmRealA2 f (ScmComplex a) (ScmRat     b) = Right $ f (realPart a) (fRat b)
-
--- Real+Complex
-liftScmRealA2 f (ScmReal    a) (ScmComplex b) = Right $ f a (realPart b)
-liftScmRealA2 f (ScmComplex a) (ScmReal    b) = Right $ f (realPart a) b
-
-liftScmRealA2 _ _ _ = fail "liftScmRealA2 :: internal error"
+liftScmRealA2 f x y =
+   case pairScmReal x y of
+        Right (ScmReal a, ScmReal b) -> Right $ f a b
+        Right (ScmRat  a, ScmRat  b) -> Right $ f a b
+        Right (ScmInt  a, ScmInt  b) -> Right $ f a b
+        Left s                       -> Left s
+        Right _                      -> fail "liftScmRealA2 :: internal error"
 
 --- RealFrac
 liftScmRealFracB2 :: (forall a. RealFrac a => a -> a -> b)
                   -> (ScmValue -> ScmValue -> ErrOr (Bool, b))
-liftScmRealFracB2 _ (ScmComplex a) _ | imagPart a /= 0 =
-   fail "liftScmRealFracB2 :: complex"
-
-liftScmRealFracB2 _ _ (ScmComplex b) | imagPart b /= 0 =
-   fail "liftScmRealFracB2 :: complex"
-
-liftScmRealFracB2 f (ScmInt     a) (ScmInt     b) =
-   Right $ (True, f (fInt a :: Rational) (fInt b))
-liftScmRealFracB2 f (ScmRat     a) (ScmRat     b) = Right $ (True,  f a b)
-liftScmRealFracB2 f (ScmReal    a) (ScmReal    b) = Right $ (False, f a b)
-liftScmRealFracB2 f (ScmComplex a) (ScmComplex b) =
-   Right $ (False, (f `on` realPart) a b)
-
--- Int+{Rat,Real,Complex}
-liftScmRealFracB2 f (ScmInt     a) (ScmRat     b) = Right$ (True, f (fInt a) b)
-liftScmRealFracB2 f (ScmRat     a) (ScmInt     b) = Right$ (True, f a (fInt b))
-liftScmRealFracB2 f (ScmInt     a) (ScmReal    b) = Right$ (False,f (fInt a) b)
-liftScmRealFracB2 f (ScmReal    a) (ScmInt     b) = Right$ (False,f a (fInt b))
-liftScmRealFracB2 f (ScmInt     a) (ScmComplex b) =
-   Right $ (False, f (fInt a) (realPart b))
-liftScmRealFracB2 f (ScmComplex a) (ScmInt     b) =
-   Right $ (False, f (realPart a) (fInt b))
-
--- Rat+{Real,Complex}
-liftScmRealFracB2 f (ScmRat     a) (ScmReal    b) = Right$ (False,f (fRat a) b)
-liftScmRealFracB2 f (ScmReal    a) (ScmRat     b) = Right$ (False,f a (fRat b))
-liftScmRealFracB2 f (ScmRat     a) (ScmComplex b) =
-   Right $ (False, f (fRat a) (realPart b))
-liftScmRealFracB2 f (ScmComplex a) (ScmRat     b) =
-   Right $ (False, f (realPart a) (fRat b))
-
--- Real+Complex
-liftScmRealFracB2 f (ScmReal    a) (ScmComplex b) =
-   Right $ (False, f a (realPart b))
-liftScmRealFracB2 f (ScmComplex a) (ScmReal    b) =
-   Right $ (False, f (realPart a) b)
-
-liftScmRealFracB2 _ _ _ = fail "liftScmRealFracB2 :: internal error"
+liftScmRealFracB2 f x y =
+   case pairScmReal x y of
+        Right (ScmReal a, ScmReal b) -> Right (False, f a b)
+        Right (ScmRat  a, ScmRat  b) -> Right (True,  f a b)
+        Right (ScmInt  a, ScmInt  b) ->
+           Right (True,  f (fInt a) (fInt b :: Rational))
+        Left s                       -> Left s
+        Right _                      ->
+           fail "liftScmRealFracB2 :: internal error"
 
 pairScmReal :: ScmValue -> ScmValue -> ErrOr (ScmValue, ScmValue)
 pairScmReal (ScmComplex a) _ | imagPart a /= 0 = fail "pairScmReal :: complex"
@@ -546,3 +464,5 @@ fInt = fromInteger
 
 fRat :: Fractional a => Rational -> a
 fRat = fromRational
+
+-- }}}
