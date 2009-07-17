@@ -17,11 +17,10 @@ import Haschoo.ScmValue (ScmValue( ScmBool, ScmChar, ScmString
 import Haschoo.Utils    (void)
 
 parser :: Parser Char [Datum]
-parser = do
-   atmosphere
-   ds <- commit $ many (datum `discard` commit atmosphere)
-   eof
-   return ds
+parser = datums `discard` eof
+
+datums :: Parser Char [Datum]
+datums = atmosphere >> (commit . many $ datum `discard` commit atmosphere)
 
 datum :: Parser Char Datum
 datum = do
@@ -73,20 +72,20 @@ quotedString =
 list :: Parser Char Datum
 list =
    bracket (one '(') (atmosphere >> one ')') $ do
-      datums <- many datum
-      if null datums
-         then return$ UnevaledApp datums
+      dats <- datums
+      if null dats
+         then return$ UnevaledApp dats
          else do
             atmosphere
             dot <- optional (one '.')
             if isJust dot
-               then DottedList datums <$> commit datum
-               else return$ UnevaledApp datums
+               then DottedList dats <$> commit datum
+               else return$ UnevaledApp dats
 
 vector :: Parser Char Datum
 vector = do
    one '#'
-   UnevaledVec <$> bracket (one '(') (atmosphere >> one ')') (many datum)
+   UnevaledVec <$> bracket (one '(') (atmosphere >> one ')') datums
 
 number :: Parser Char ScmValue
 number = do
