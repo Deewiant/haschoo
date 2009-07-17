@@ -54,7 +54,7 @@ ident = do
       xs <- many (pElem (initial ++ "+-.@" ++ ['0'..'9']))
       return$ UnevaledId (x:xs)
     where
-      initial = ['a'..'z'] ++ "!$%&*/:<=>?^_~"
+      initial = ['a'..'z'] ++ ['A'..'Z'] ++ "!$%&*/:<=>?^_~"
 
 bool :: Parser Char ScmValue
 bool = one '#' >> ScmBool . (=='t') <$> (pElem "tf")
