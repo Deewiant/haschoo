@@ -6,7 +6,8 @@ module Haschoo.Evaluator.Primitives.Numeric (primitives) where
 
 import Control.Arrow       ((&&&), (***))
 import Control.Monad       (ap, foldM)
-import Data.Complex        (Complex((:+)), imagPart, realPart, phase)
+import Data.Complex        ( Complex((:+)), mkPolar
+                           , imagPart, realPart, phase, magnitude)
 import Data.Ratio          (numerator, denominator, approxRational)
 import Data.Function       (on)
 
@@ -72,6 +73,13 @@ primitives = map (\(a,b) -> (a, ScmFunc a b)) $
 
    , ("sqrt", scmSqrt)
    , ("expt", scmExpt)
+
+   , ("make-rectangular", scmMakeRectangular)
+   , ("make-polar",       scmMakePolar)
+   , ("real-part",        scmRealPart)
+   , ("imag-part",        scmImagPart)
+   , ("magnitude",        scmNorm)
+   , ("angle",            scmAngle)
    ]
 
 ---- Predicates
@@ -308,6 +316,42 @@ scmExpt [x,y] =
 
 scmExpt (_:_:_) = tooManyArgs "expt"
 scmExpt _       = tooFewArgs  "expt"
+
+-- make-rectangular make-polar real-part imag-part magnitude angle
+
+scmMakeRectangular, scmMakePolar :: [ScmValue] -> ErrOr ScmValue
+scmMakeRectangular = scmMakeComplex (:+)    "make-rectangular"
+scmMakePolar       = scmMakeComplex mkPolar "make-polar"
+
+scmMakeComplex :: (Double -> Double -> Complex Double) -> String
+               -> [ScmValue] -> ErrOr ScmValue
+scmMakeComplex f s [x,y] =
+   case pairScmReal x y of
+        Left _                       -> notReal s
+        Right (ScmReal a, ScmReal b) -> Right . ScmComplex $ f a b
+        Right (ScmRat  a, ScmRat  b) ->
+           Right . ScmComplex $ (f `on` fromRational) a b
+        Right (ScmInt  a, ScmInt  b) ->
+           Right . ScmComplex $ (f `on` fromInteger) a b
+        Right _                      ->
+           error $ s ++ " :: internal error"
+
+scmMakeComplex _ s (_:_:_) = tooManyArgs s
+scmMakeComplex _ s _       = tooFewArgs  s
+
+scmRealPart, scmImagPart, scmNorm, scmAngle :: [ScmValue] -> ErrOr ScmValue
+scmRealPart = scmComplexPart realPart  "real-part"
+scmImagPart = scmComplexPart imagPart  "imag-part"
+scmNorm     = scmComplexPart magnitude "magnitude"
+scmAngle    = scmComplexPart phase     "angle"
+
+scmComplexPart :: (Complex Double -> Double) -> String
+               -> [ScmValue] -> ErrOr ScmValue
+scmComplexPart f _ [ScmComplex x]    = Right $ ScmReal (f x)
+scmComplexPart _ _ [x] | isNumeric x = Right x
+scmComplexPart _ s [_]               = notNum s
+scmComplexPart _ s []                = tooFewArgs s
+scmComplexPart _ s _                 = tooManyArgs s
 
 -------------
 
