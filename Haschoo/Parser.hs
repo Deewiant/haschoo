@@ -18,15 +18,18 @@ import Haschoo.Utils    (void)
 
 parser :: Parser Char [Datum]
 parser = do
-   ds <- many datum
+   atmosphere
+   ds <- commit $ many (datum `discard` commit atmosphere)
    eof
    return ds
 
 datum :: Parser Char Datum
 datum = do
-   atmosphere
    quoted <- optional (one '\'' >> commit atmosphere)
-   dat    <- oneOf [ident, list, vector, value]
+   dat    <- oneOf' [ ("identifier", ident)
+                    , ("list", list)
+                    , ("vector", vector)
+                    , ("value", value) ]
    return$ if isJust quoted
               then Quoted dat
               else dat
@@ -242,6 +245,7 @@ number = do
 -- Pushes back anything relevant for other parsers
 delimiter :: Parser Char ()
 delimiter = oneOf [whitespaceOrComment, pElem "()\"" >>= reparse.return, eof]
+   `usingError` "Invalid delimiter"
 
 atmosphere :: Parser Char ()
 atmosphere = void $ many whitespaceOrComment
