@@ -78,7 +78,7 @@ quotedString =
 list :: Parser Char Datum
 list =
    bracket (one '(') (atmosphere >> one ')') $ do
-      dats <- datums
+      dats <- datums `adjustErr` (("In a list:\n"++) . indent 2)
       if null dats
          then return$ UnevaledApp dats
          else do
