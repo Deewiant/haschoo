@@ -200,8 +200,8 @@ scmDenominator = scmNumerDenom denominator "denominator"
 
 scmNumerDenom :: (Rational -> Integer) -> String
               -> [ScmValue] -> ErrOr ScmValue
-scmNumerDenom f s [x] =
-   case x of
+scmNumerDenom f s [n] =
+   case n of
         ScmInt      x       -> Right . ScmInt  $ f (fromInteger x)
         ScmRat      x       -> Right . ScmInt  $ f x
         ScmReal     x       -> Right . ScmReal . fromInteger $ f (realToFrac x)

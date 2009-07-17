@@ -27,8 +27,9 @@ eval ctx (UnevaledApp xs) =
             Right (ScmFunc _ f : as) -> f as
             Right _                  -> fail "Can't apply non-function"
 
-eval _ (Quoted      _)   = fail "Can't eval quoted yet"
-eval _ (QuasiQuoted _)   = fail "Can't eval quasiquoted yet"
-eval _ (UnQuoted    _)   = fail "Can't eval unquoted yet"
-eval _ (UnevaledVec _)   = fail "Can't eval vector yet"
-eval _ (DottedList  _ _) = fail "Can't eval dotted yet"
+eval _ (Quoted       _)   = fail "Can't eval quoted yet"
+eval _ (QuasiQuoted  _)   = fail "Can't eval quasiquoted yet"
+eval _ (UnQuoted     _)   = fail "Can't eval unquoted yet"
+eval _ (FlatUnQuoted _)   = fail "Can't eval flat-unquoted yet"
+eval _ (UnevaledVec  _)   = fail "Can't eval vector yet"
+eval _ (DottedList   _ _) = fail "Can't eval dotted yet"

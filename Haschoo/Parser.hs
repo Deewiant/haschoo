@@ -42,6 +42,7 @@ datum = do
    quote ('`'     :qs) = QuasiQuoted  . quote qs
    quote (',' :'@':qs) = FlatUnQuoted . quote qs
    quote (','     :qs) = UnQuoted     . quote qs
+   quote _             = error "Parser.quote :: internal error"
 
 value :: Parser Char Datum
 value = Evaluated <$> oneOf [bool, number, character, quotedString]
@@ -293,9 +294,6 @@ eof = do
 
 pElem :: [Char] -> Parser Char Char
 pElem = satisfyNoCase . flip elem
-
-pNotElem :: [Char] -> Parser Char Char
-pNotElem = satisfyNoCase . flip notElem
 
 satisfyNoCase :: (Char -> Bool) -> Parser Char Char
 satisfyNoCase p = do
