@@ -202,7 +202,7 @@ number = do
                  , do n <- many1 (digit 10)
                       hashes <- many1 (one '#')
                       one '.'
-                      hashes2 <- commit $ many (one '#')
+                      hashes2 <- many (one '#')
                       return . inexactHashes (hashes ++ hashes2) . ScmInt $
                          readInteger 10 (n ++ map (const '0') hashes)
                  ]
@@ -211,7 +211,7 @@ number = do
    tryExponent n = do
       ex <- optional $ do pElem "esfdlESFDL" -- Ignore the exponent: all Double
                           neg <- optional sign
-                          xs  <- commit $ many1 (digit 10)
+                          xs  <- many1 (digit 10)
                           return$ (fromMaybe 1 neg) * readInteger 10 xs
       return$ case ex of
                    Nothing -> n
