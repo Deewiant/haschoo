@@ -204,7 +204,7 @@ scmQuotRemMod f s [x,y] = do
 scmQuotRemMod _ s (_:_:_) = tooManyArgs s
 scmQuotRemMod _ s _       = tooFewArgs  s
 
--- gcd lcm
+---- gcd lcm
 
 scmGcd, scmLcm :: [ScmValue] -> ErrOr ScmValue
 scmGcd = scmGcdLcm gcd "gcd"
@@ -217,7 +217,7 @@ scmGcdLcm f s = fmap fin . foldM go (True,0)
    go  (exact, n) = fmap ((exact &&) *** f n) . asInt s
    fin (exact, n) = if exact then ScmInt n else ScmReal (fromInteger n)
 
--- numerator denominator
+---- numerator denominator
 
 scmNumerator, scmDenominator :: [ScmValue] -> ErrOr ScmValue
 scmNumerator   = scmNumerDenom numerator   "numerator"
@@ -236,7 +236,7 @@ scmNumerDenom f s [n] =
 scmNumerDenom _ s [] = tooFewArgs s
 scmNumerDenom _ s _  = tooManyArgs s
 
--- floor ceil trunc round
+---- floor ceil trunc round
 
 scmFloor, scmCeil, scmTrunc, scmRound :: [ScmValue] -> ErrOr ScmValue
 scmFloor = scmGenericRound floor    "floor"
@@ -253,7 +253,7 @@ scmGenericRound _ s [_]            = notReal s
 scmGenericRound _ s []             = tooFewArgs s
 scmGenericRound _ s _              = tooManyArgs s
 
--- rationalize
+---- rationalize
 
 scmRationalize :: [ScmValue] -> ErrOr ScmValue
 scmRationalize (_:_:_:_) = tooManyArgs "rationalize"
@@ -265,7 +265,7 @@ scmRationalize [x,y]     =
 
 scmRationalize _         = tooFewArgs "rationalize"
 
--- exp log sin cos tan asin acos atan sqrt
+---- exp log sin cos tan asin acos atan sqrt
 
 scmExp, scmLog,
  scmSin,  scmCos,  scmTan,
@@ -304,7 +304,7 @@ scmComplex1 _ s [_]            = notNum s
 scmComplex1 _ s []             = tooFewArgs s
 scmComplex1 _ s _              = tooManyArgs s
 
--- expt
+---- expt
 
 scmExpt :: [ScmValue] -> ErrOr ScmValue
 scmExpt [x,y] =
@@ -320,7 +320,7 @@ scmExpt [x,y] =
 scmExpt (_:_:_) = tooManyArgs "expt"
 scmExpt _       = tooFewArgs  "expt"
 
--- make-rectangular make-polar real-part imag-part magnitude angle
+---- make-rectangular make-polar real-part imag-part magnitude angle
 
 scmMakeRectangular, scmMakePolar :: [ScmValue] -> ErrOr ScmValue
 scmMakeRectangular = scmMakeComplex (:+)    "make-rectangular"
