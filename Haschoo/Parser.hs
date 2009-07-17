@@ -3,13 +3,16 @@
 module Haschoo.Parser (parser) where
 
 import Control.Applicative ((<$>))
-import Control.Monad (join)
-import Data.Char (digitToInt, isDigit, isHexDigit, isOctDigit, isSpace)
-import Data.Complex (Complex((:+)), mkPolar)
-import Data.Maybe (fromJust, fromMaybe, isJust)
-import Data.Ratio ((%))
-import Numeric (readInt)
+import Control.Monad       (join)
+import Data.Char           ( isDigit, isHexDigit, isOctDigit, isSpace
+                           , digitToInt, toLower)
+import Data.Complex        (Complex((:+)), mkPolar)
+import Data.Maybe          (fromJust, fromMaybe, isJust)
+import Data.Ratio          ((%))
+import Numeric             (readInt)
 import Text.ParserCombinators.Poly.Plain
+   ( Parser, next, apply, satisfy, discard, commit, adjustErr, onFail, reparse
+   , many, many1, oneOf, oneOf', bracket, indent, optional)
 
 import Haschoo.Datum    (Datum(..))
 import Haschoo.ScmValue (ScmValue( ScmBool, ScmChar, ScmString
@@ -58,7 +61,7 @@ ident = do
       initial = ['a'..'z'] ++ ['A'..'Z'] ++ "!$%&*/:<=>?^_~"
 
 bool :: Parser Char ScmValue
-bool = one '#' >> ScmBool . (=='t') <$> (pElem "tf")
+bool = one '#' >> ScmBool . (== 't') <$> (pElem "ft")
 
 character :: Parser Char ScmValue
 character = do
@@ -272,10 +275,10 @@ whitespaceOrComment =
 
    notNewline = satisfy (`notElem` "\n\r")
 
-one :: Eq a => a -> Parser a a
-one = satisfy . (==)
+one :: Char -> Parser Char Char
+one = satisfyNoCase . (==)
 
-string :: Eq a => [a] -> Parser a [a]
+string :: String -> Parser Char String
 string []     = return []
 string (x:xs) = do
    c <- one x
@@ -288,11 +291,16 @@ eof = do
         Just c  -> reparse [c] >> fail "Expected EOF"
         Nothing -> return ()
 
-pElem :: Eq a => [a] -> Parser a a
-pElem = satisfy . flip elem
+pElem :: [Char] -> Parser Char Char
+pElem = satisfyNoCase . flip elem
 
-pNotElem :: Eq a => [a] -> Parser a a
-pNotElem = satisfy . flip notElem
+pNotElem :: [Char] -> Parser Char Char
+pNotElem = satisfyNoCase . flip notElem
+
+satisfyNoCase :: (Char -> Bool) -> Parser Char Char
+satisfyNoCase p = do
+   c <- toLower <$> next
+   if p c then return c else fail "satisfy failed"
 
 usingError :: Parser a b -> String -> Parser a b
 usingError p = adjustErr p . const
