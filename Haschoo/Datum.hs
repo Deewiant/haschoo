@@ -7,6 +7,8 @@ import Haschoo.Utils    (showScmList)
 
 data Datum = Evaluated   ScmValue
            | Quoted      Datum
+           | QuasiQuoted Datum
+           | UnQuoted    Datum
            | UnevaledId  String
            | UnevaledApp [Datum]
            | UnevaledVec [Datum]
@@ -16,6 +18,8 @@ data Datum = Evaluated   ScmValue
 scmShowDatum :: Datum -> String
 scmShowDatum (Evaluated v)     = scmShow v
 scmShowDatum (Quoted x)        = '\'': scmShowDatum x
+scmShowDatum (QuasiQuoted x)   = '`' : scmShowDatum x
+scmShowDatum (UnQuoted x)      = ',' : scmShowDatum x
 scmShowDatum (UnevaledId s)    = s
 scmShowDatum (UnevaledApp xs)  = showScmList scmShowDatum xs
 scmShowDatum (UnevaledVec xs)  = '#' : showScmList scmShowDatum xs

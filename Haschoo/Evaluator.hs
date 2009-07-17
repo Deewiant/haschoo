@@ -28,5 +28,7 @@ eval ctx (UnevaledApp xs) =
             Right _                  -> fail "Can't apply non-function"
 
 eval _ (Quoted      _)   = fail "Can't eval quoted yet"
+eval _ (QuasiQuoted _)   = fail "Can't eval quasiquoted yet"
+eval _ (UnQuoted    _)   = fail "Can't eval unquoted yet"
 eval _ (UnevaledVec _)   = fail "Can't eval vector yet"
 eval _ (DottedList  _ _) = fail "Can't eval dotted yet"

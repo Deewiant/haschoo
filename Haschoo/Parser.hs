@@ -24,14 +24,19 @@ datums = atmosphere >> (commit . many $ datum `discard` commit atmosphere)
 
 datum :: Parser Char Datum
 datum = do
-   quoted <- optional (one '\'' >> commit atmosphere)
-   dat    <- oneOf' [ ("identifier", ident)
-                    , ("list", list)
-                    , ("vector", vector)
-                    , ("value", value) ]
-   return$ if isJust quoted
-              then Quoted dat
-              else dat
+   quoted <- optional $ oneOf [one '\'', one '`', one ',']
+                           `discard` commit atmosphere
+
+   dat <- oneOf' [ ("identifier", ident)
+                 , ("list", list)
+                 , ("vector", vector)
+                 , ("value", value) ]
+
+   return$ case quoted of
+                Nothing   ->             dat
+                Just '\'' -> Quoted      dat
+                Just '`'  -> QuasiQuoted dat
+                Just ','  -> UnQuoted    dat
 
 value :: Parser Char Datum
 value = Evaluated <$> oneOf [bool, number, character, quotedString]
