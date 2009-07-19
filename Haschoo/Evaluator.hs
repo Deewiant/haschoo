@@ -5,8 +5,7 @@ module Haschoo.Evaluator where
 import qualified Data.IntMap as IM
 import qualified Data.ListTrie.Patricia.Map.Enum as TM
 
-import Haschoo.Datum             (Datum(..))
-import Haschoo.ScmValue          (ScmValue(..))
+import Haschoo.Datum             (Datum(..), ScmValue(ScmPrim, ScmFunc))
 import Haschoo.Utils             (ErrOr)
 import Haschoo.Evaluator.Context (Context(..))
 

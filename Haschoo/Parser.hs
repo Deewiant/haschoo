@@ -14,10 +14,8 @@ import Text.ParserCombinators.Poly.Plain
    ( Parser, next, apply, satisfy, discard, commit, adjustErr, onFail, reparse
    , many, many1, oneOf, oneOf', bracket, indent, optional)
 
-import Haschoo.Datum    (Datum(..))
-import Haschoo.ScmValue (ScmValue( ScmBool, ScmChar, ScmString
-                                 , ScmInt, ScmRat, ScmReal, ScmComplex))
-import Haschoo.Utils    (void)
+import Haschoo.Datum (Datum(..), ScmValue(..))
+import Haschoo.Utils (void)
 
 program :: Parser Char [Datum]
 program = datums `discard` eof

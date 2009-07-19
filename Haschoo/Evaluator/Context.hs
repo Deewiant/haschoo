@@ -7,8 +7,8 @@ import qualified Data.IntMap as IM
 import           Data.ListTrie.Patricia.Map.Enum (TrieMap)
 import qualified Data.ListTrie.Patricia.Map.Enum as TM
 
-import Haschoo.ScmValue (ScmValue)
-import Haschoo.Utils    (swap)
+import Haschoo.Datum (ScmValue)
+import Haschoo.Utils (swap)
 
 data Context = Context { idMap  :: TrieMap Char Int
                        , valMap :: IntMap ScmValue }

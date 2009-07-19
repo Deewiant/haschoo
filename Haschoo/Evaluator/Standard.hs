@@ -2,7 +2,7 @@
 
 module Haschoo.Evaluator.Standard (context) where
 
-import           Haschoo.ScmValue          (ScmValue)
+import           Haschoo.Datum             (ScmValue)
 import           Haschoo.Evaluator.Context (Context, mkContext)
 import qualified Haschoo.Evaluator.Standard.Numeric as Numeric
 
