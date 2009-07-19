@@ -15,8 +15,9 @@ import Numeric       (showIntAtBase, showSigned)
 import Text.ParserCombinators.Poly.Plain (runParser)
 
 import qualified Haschoo.Parser as Parser
-import           Haschoo.ScmValue (ScmValue(..))
-import           Haschoo.Utils    (ErrOr, allM, ($<), (.:))
+import           Haschoo.ScmValue        (ScmValue(..))
+import           Haschoo.Utils           (ErrOr, allM, ($<), (.:))
+import           Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
 
 procedures :: [(String, ScmValue)]
 procedures = map (\(a,b) -> (a, ScmFunc a b)) $
@@ -448,13 +449,11 @@ scmToNumber _  =
 
 -------------
 
-notInt, notNum, notReal, notRat, tooFewArgs, tooManyArgs :: String -> ErrOr a
+notInt, notNum, notReal, notRat :: String -> ErrOr a
 notInt      = fail . ("Noninteger argument to primitive procedure " ++)
 notNum      = fail . ("Nonnumeric argument to primitive procedure " ++)
 notReal     = fail . ("Nonreal argument to primitive procedure " ++)
 notRat      = fail . ("Nonrational argument to primitive procedure " ++)
-tooFewArgs  = fail . ("Too few arguments to primitive procedure " ++)
-tooManyArgs = fail . ("Too many arguments to primitive procedure " ++)
 
 isNumeric, isInteger :: ScmValue -> Bool
 isNumeric (ScmInt     _) = True
