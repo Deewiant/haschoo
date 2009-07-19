@@ -1,6 +1,6 @@
 -- File created: 2009-07-15 21:15:44
 
-{-# LANGUAGE FlexibleInstances, Rank2Types, TypeSynonymInstances #-}
+{-# LANGUAGE Rank2Types #-}
 
 module Haschoo.Evaluator.Primitives.Numeric (primitives) where
 
