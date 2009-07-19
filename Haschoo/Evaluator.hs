@@ -6,9 +6,8 @@ import           Control.Monad (liftM2, msum)
 import qualified Data.IntMap as IM
 import qualified Data.ListTrie.Patricia.Map.Enum as TM
 
-import Haschoo.Datum             (Datum(..), ScmValue(ScmPrim, ScmFunc))
-import Haschoo.Utils             (ErrOr)
-import Haschoo.Evaluator.Context (Context(..))
+import Haschoo.Types (Datum(..), ScmValue(ScmPrim, ScmFunc), Context(..))
+import Haschoo.Utils (ErrOr)
 
 eval :: [Context] -> Datum -> ErrOr ScmValue
 eval _   (Evaluated  v) = Right v
@@ -20,12 +19,16 @@ eval ctx (UnevaledId s) =
                            Just v  -> Right v
 
 eval ctx (UnevaledApp xs) =
-   let es = mapM (eval ctx) xs
-    in case es of
-            Left s                   -> fail s
-            Right []                 -> fail "Empty application"
-            Right (ScmFunc _ f : as) -> f as
-            Right _                  -> fail "Can't apply non-function"
+   case xs of
+        []   -> fail "Empty application"
+        y:ys ->
+           case eval ctx y of
+                Left  s             -> fail s
+                Right (ScmPrim _ f) -> f ctx ys
+                Right (ScmFunc _ f) -> case mapM (eval ctx) ys of
+                                            Left  s    -> fail s
+                                            Right args -> f args
+                Right _             -> fail "Can't apply non-function"
 
 eval _ (Quoted       _)   = fail "Can't eval quoted yet"
 eval _ (QuasiQuoted  _)   = fail "Can't eval quasiquoted yet"

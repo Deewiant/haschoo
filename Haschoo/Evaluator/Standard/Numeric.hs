@@ -15,7 +15,7 @@ import Numeric       (showIntAtBase, showSigned)
 import Text.ParserCombinators.Poly.Plain (runParser)
 
 import qualified Haschoo.Parser as Parser
-import           Haschoo.Datum           (ScmValue(..))
+import           Haschoo.Types           (ScmValue(..))
 import           Haschoo.Utils           (ErrOr, allM, ($<), (.:))
 import           Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
 

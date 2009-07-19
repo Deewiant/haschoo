@@ -2,8 +2,7 @@
 
 module Haschoo.Evaluator.Standard (context) where
 
-import           Haschoo.Datum             (ScmValue)
-import           Haschoo.Evaluator.Context (Context, mkContext)
+import           Haschoo.Types             (ScmValue, Context, mkContext)
 import qualified Haschoo.Evaluator.Standard.Numeric as Numeric
 
 procedures :: [(String, ScmValue)]

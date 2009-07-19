@@ -11,6 +11,19 @@ type ErrOr = Either String
 swap :: (a,b) -> (b,a)
 swap ~(a,b) = (b,a)
 
+compareLengths :: [a] -> [b] -> Ordering
+compareLengths []     []     = EQ
+compareLengths (_:_)  []     = GT
+compareLengths []     (_:_)  = LT
+compareLengths (_:as) (_:bs) = compareLengths as bs
+
+compareLength :: [a] -> Int -> Ordering
+compareLength _      n | n < 0 = GT
+compareLength []     0         = EQ
+compareLength []     _         = LT
+compareLength (_:_)  0         = GT
+compareLength (_:as) n         = compareLength as n
+
 showScmList :: (a -> String) -> [a] -> String
 showScmList f xs = concat ["(", intercalate " " (map f xs), ")"]
 

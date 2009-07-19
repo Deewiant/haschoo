@@ -1,12 +1,21 @@
 -- File created: 2009-07-11 21:47:19
 
-module Haschoo.Datum where
+-- ScmValue depends on Datum and Context
+-- Datum    depends on ScmValue
+-- Context  depends on ScmValue
+--
+-- Thus they all have to be in the same module, to avoid circular dependencies.
+module Haschoo.Types where
 
-import Data.Complex        (Complex((:+)))
-import Data.Ratio          (numerator, denominator)
-import Text.Show.Functions ()
+import           Data.Complex (Complex((:+)))
+import           Data.IntMap  (IntMap)
+import qualified Data.IntMap as IM
+import           Data.ListTrie.Patricia.Map.Enum (TrieMap)
+import qualified Data.ListTrie.Patricia.Map.Enum as TM
+import           Data.Ratio          (numerator, denominator)
+import           Text.Show.Functions ()
 
-import Haschoo.Utils (ErrOr, showScmList)
+import Haschoo.Utils (ErrOr, swap, showScmList)
 
 data Datum = Evaluated    ScmValue
            | Quoted       Datum
@@ -19,8 +28,8 @@ data Datum = Evaluated    ScmValue
            | DottedList   [Datum] Datum
  deriving Show
 
-data ScmValue = ScmPrim    String !([Datum]    -> ErrOr ScmValue)
-              | ScmFunc    String !([ScmValue] -> ErrOr ScmValue)
+data ScmValue = ScmPrim    String !([Context] -> [Datum]    -> ErrOr ScmValue)
+              | ScmFunc    String !(             [ScmValue] -> ErrOr ScmValue)
               | ScmBool    !Bool
               | ScmChar    !Char
               | ScmString  !String
@@ -31,8 +40,23 @@ data ScmValue = ScmPrim    String !([Datum]    -> ErrOr ScmValue)
               | ScmList    ![ScmValue]
  deriving Show
 
+data Context = Context { idMap  :: TrieMap Char Int
+                       , valMap :: IntMap ScmValue }
+ deriving Show
+
+mkContext :: [(String, ScmValue)] -> Context
+mkContext namedVals = Context ids vals
+ where
+   key   = zip [0..]
+   vals  = IM.fromList .            key . map snd $ namedVals
+   ids   = TM.fromList . map swap . key . map fst $ namedVals
+
+contextSize :: Context -> Int
+contextSize = IM.size . valMap
+
 scmShow :: ScmValue -> String
 scmShow (ScmBool b)   = '#' : if b then "t" else "f"
+scmShow (ScmPrim s _) = s
 scmShow (ScmFunc s _) = s
 scmShow (ScmList xs)  = showScmList scmShow xs
 scmShow (ScmInt n)    = show n

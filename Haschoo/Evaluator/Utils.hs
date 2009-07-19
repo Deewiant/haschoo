@@ -5,5 +5,5 @@ module Haschoo.Evaluator.Utils where
 import Haschoo.Utils (ErrOr)
 
 tooFewArgs, tooManyArgs :: String -> ErrOr a
-tooFewArgs  = fail . ("Too few arguments to primitive procedure " ++)
-tooManyArgs = fail . ("Too many arguments to primitive procedure " ++)
+tooFewArgs  = fail . ("Too few arguments to " ++)
+tooManyArgs = fail . ("Too many arguments to " ++)
