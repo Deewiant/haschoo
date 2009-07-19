@@ -2,7 +2,7 @@
 
 {-# LANGUAGE Rank2Types #-}
 
-module Haschoo.Evaluator.Primitives.Numeric (primitives) where
+module Haschoo.Evaluator.Standard.Numeric (procedures) where
 
 import Control.Arrow ((&&&), (***))
 import Control.Monad (ap, foldM)
@@ -18,8 +18,8 @@ import qualified Haschoo.Parser as Parser
 import           Haschoo.ScmValue (ScmValue(..))
 import           Haschoo.Utils    (ErrOr, allM, ($<), (.:))
 
-primitives :: [(String, ScmValue)]
-primitives = map (\(a,b) -> (a, ScmFunc a b)) $
+procedures :: [(String, ScmValue)]
+procedures = map (\(a,b) -> (a, ScmFunc a b)) $
    [ ("number?",   fmap ScmBool . scmIsNumber)
    , ("complex?",  fmap ScmBool . scmIsNumber)
    , ("real?",     fmap ScmBool . scmIsReal)

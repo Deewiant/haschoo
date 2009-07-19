@@ -7,9 +7,9 @@ import qualified Data.IntMap as IM
 import           Data.ListTrie.Patricia.Map.Enum (TrieMap)
 import qualified Data.ListTrie.Patricia.Map.Enum as TM
 
-import Haschoo.ScmValue             (ScmValue)
-import Haschoo.Evaluator.Primitives (primitives)
-import Haschoo.Utils                (swap)
+import Haschoo.ScmValue           (ScmValue)
+import Haschoo.Evaluator.Standard (procedures)
+import Haschoo.Utils              (swap)
 
 data Context = Context { idMap  :: TrieMap Char Int
                        , valMap :: IntMap ScmValue }
@@ -19,5 +19,5 @@ topContext :: Context
 topContext = Context ids vals
  where
    key   = zip [0..]
-   vals  = IM.fromList .            key . map snd $ primitives
-   ids   = TM.fromList . map swap . key . map fst $ primitives
+   vals  = IM.fromList .            key . map snd $ procedures
+   ids   = TM.fromList . map swap . key . map fst $ procedures
