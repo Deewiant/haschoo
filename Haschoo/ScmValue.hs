@@ -42,7 +42,7 @@ scmShow (ScmChar c) | c == ' '  = "#\\space"
                     | c == '\n' = "#\\newline"
                     | otherwise = "#\\" ++ [c]
 
-scmShow (ScmString s) = foldr ((.) . f) id s s
+scmShow (ScmString s) = '"' : foldr ((.) . f) id s "\""
  where
    f c | c == '\\' = showString "\\\\"
        | c == '\"' = showString "\\\""
