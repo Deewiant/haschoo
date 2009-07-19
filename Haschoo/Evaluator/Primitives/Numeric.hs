@@ -4,15 +4,19 @@
 
 module Haschoo.Evaluator.Primitives.Numeric (primitives) where
 
-import Control.Arrow       ((&&&), (***))
-import Control.Monad       (ap, foldM)
-import Data.Complex        ( Complex((:+)), mkPolar
-                           , imagPart, realPart, phase, magnitude)
-import Data.Ratio          (numerator, denominator, approxRational)
-import Data.Function       (on)
+import Control.Arrow ((&&&), (***))
+import Control.Monad (ap, foldM)
+import Data.Char     (intToDigit)
+import Data.Complex  ( Complex((:+)), mkPolar
+                     , imagPart, realPart, phase, magnitude)
+import Data.Ratio    (numerator, denominator, approxRational)
+import Data.Function (on)
+import Numeric       (showIntAtBase, showSigned)
+import Text.ParserCombinators.Poly.Plain (runParser)
 
-import Haschoo.ScmValue (ScmValue(..))
-import Haschoo.Utils    (ErrOr, allM, ($<), (.:))
+import qualified Haschoo.Parser as Parser
+import           Haschoo.ScmValue (ScmValue(..))
+import           Haschoo.Utils    (ErrOr, allM, ($<), (.:))
 
 primitives :: [(String, ScmValue)]
 primitives = map (\(a,b) -> (a, ScmFunc a b)) $
@@ -83,6 +87,9 @@ primitives = map (\(a,b) -> (a, ScmFunc a b)) $
 
    , ("exact->inexact", scmToInexact)
    , ("inexact->exact", scmToExact)
+
+   , ("number->string", scmToString)
+   , ("string->number", scmToNumber)
    ]
 
 ---- Predicates
@@ -380,6 +387,62 @@ scmToExact [x] | isNumeric x  = Right x
 scmToExact [_]                = notNum      "exact->inexact"
 scmToExact []                 = tooFewArgs  "exact->inexact"
 scmToExact _                  = tooManyArgs "exact->inexact"
+
+---- number->string string->number
+
+scmToString, scmToNumber :: [ScmValue] -> ErrOr ScmValue
+
+scmToString (x:xs) | isNumeric x =
+   case xs of
+        []             -> fmap ScmString $ f x 10
+        [ScmInt radix] -> if radix `elem` [2,8,10,16]
+                             then fmap ScmString $ f x (fromInteger radix)
+                             else fail "number->string :: invalid radix"
+        [_]            -> notInt      "number->string"
+        _              -> tooManyArgs "number->string"
+ where
+   f (ScmInt i) radix = Right $ showInt radix i
+   f (ScmRat r) radix = Right $
+      concat [showInt radix (numerator r), "/", showInt radix (denominator r)]
+
+   f (ScmReal r) radix =
+      if radix == 10
+         then
+            -- R5RS 6.2.6 specifies that "the result contains a decimal point"
+            -- if inexact and a decimal-point containing result can make it
+            -- work
+            Right (show r)
+         else fail "number->string :: nondecimal radix for inexact real"
+
+   f (ScmComplex r) radix =
+      -- As in the ScmReal case
+      if radix == 10
+         then Right (show r)
+         else fail "number->string :: nondecimal radix for inexact complex"
+
+   showInt radix i = showSigned (showIntAtBase radix intToDigit) 0 i ""
+
+scmToString []  = tooFewArgs "number->string"
+scmToString [_] = notNum     "number->string"
+
+scmToNumber (ScmString s : xs) =
+   case xs of
+        []             -> Right $ f s 10
+        [ScmInt radix] -> if radix `elem` [2,8,10,16]
+                             then Right $ f s (fromInteger radix)
+                             else fail "string->number :: invalid radix"
+        [_]            -> notInt      "string->number"
+        _              -> tooManyArgs "string->number"
+ where
+   f str radix =
+      let (mn,_) = runParser (Parser.number radix) str
+       in case mn of
+               Right n | isNumeric n -> n
+               _                     -> ScmBool False
+
+scmToNumber []  = tooFewArgs "string->number"
+scmToNumber [_] =
+   fail "Nonstring argument to primitive procedure string->number"
 
 -------------
 

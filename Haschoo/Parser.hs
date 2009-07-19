@@ -1,6 +1,6 @@
 -- File created: 2009-07-11 20:29:49
 
-module Haschoo.Parser (parser) where
+module Haschoo.Parser (parser, number) where
 
 import Control.Applicative ((<$>))
 import Control.Monad       (join)
@@ -45,7 +45,7 @@ datum = do
    quote _             = error "Parser.quote :: internal error"
 
 value :: Parser Char Datum
-value = Evaluated <$> oneOf [bool, number, character, quotedString]
+value = Evaluated <$> oneOf [bool, number 10, character, quotedString]
 
 ident :: Parser Char Datum
 ident = do
@@ -100,12 +100,12 @@ vector = do
    one '#'
    UnevaledVec <$> bracket (one '(') (atmosphere >> one ')') datums
 
-number :: Parser Char ScmValue
-number = do
+number :: Int -> Parser Char ScmValue
+number defRadix = do
    (radix,exact) <- prefix
 
    let gotPrefix = isJust radix || isJust exact
-   n <- (if gotPrefix then commit else id) $ complex (fromMaybe 10 radix)
+   n <- (if gotPrefix then commit else id) $ complex (fromMaybe defRadix radix)
 
    delimiter
 
