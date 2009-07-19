@@ -2,6 +2,7 @@
 
 module Haschoo.Evaluator where
 
+import           Control.Monad (liftM2, msum)
 import qualified Data.IntMap as IM
 import qualified Data.ListTrie.Patricia.Map.Enum as TM
 
@@ -9,14 +10,14 @@ import Haschoo.Datum             (Datum(..), ScmValue(ScmPrim, ScmFunc))
 import Haschoo.Utils             (ErrOr)
 import Haschoo.Evaluator.Context (Context(..))
 
-eval :: Context -> Datum -> ErrOr ScmValue
+eval :: [Context] -> Datum -> ErrOr ScmValue
 eval _   (Evaluated  v) = Right v
 eval ctx (UnevaledId s) =
-   case TM.lookup s (idMap ctx) of
-        Nothing -> fail $ "Unbound identifier " ++ s
-        Just i  -> case IM.lookup i (valMap ctx) of
-                        Nothing -> fail $ "Internal error looking up " ++ s
-                        Just v  -> Right v
+   case msum $ map (liftM2 fmap (,) (TM.lookup s . idMap)) ctx of
+        Nothing    -> fail $ "Unbound identifier " ++ s
+        Just (c,i) -> case IM.lookup i (valMap c) of
+                           Nothing -> fail $ "Internal error looking up " ++ s
+                           Just v  -> Right v
 
 eval ctx (UnevaledApp xs) =
    let es = mapM (eval ctx) xs
