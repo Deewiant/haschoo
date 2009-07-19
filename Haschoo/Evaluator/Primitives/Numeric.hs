@@ -420,10 +420,12 @@ scmToString (x:xs) | isNumeric x =
          then Right (show r)
          else fail "number->string :: nondecimal radix for inexact complex"
 
+   f _ _ = error "number->string :: the impossible happened"
+
    showInt radix i = showSigned (showIntAtBase radix intToDigit) 0 i ""
 
-scmToString []  = tooFewArgs "number->string"
-scmToString [_] = notNum     "number->string"
+scmToString [] = tooFewArgs "number->string"
+scmToString _  = notNum     "number->string"
 
 scmToNumber (ScmString s : xs) =
    case xs of
@@ -440,8 +442,8 @@ scmToNumber (ScmString s : xs) =
                Right n | isNumeric n -> n
                _                     -> ScmBool False
 
-scmToNumber []  = tooFewArgs "string->number"
-scmToNumber [_] =
+scmToNumber [] = tooFewArgs "string->number"
+scmToNumber _  =
    fail "Nonstring argument to primitive procedure string->number"
 
 -------------
