@@ -1,6 +1,6 @@
 -- File created: 2009-07-11 20:29:49
 
-module Haschoo.Parser (parser, number) where
+module Haschoo.Parser (program, number) where
 
 import Control.Applicative ((<$>))
 import Control.Monad       (join)
@@ -19,8 +19,8 @@ import Haschoo.ScmValue (ScmValue( ScmBool, ScmChar, ScmString
                                  , ScmInt, ScmRat, ScmReal, ScmComplex))
 import Haschoo.Utils    (void)
 
-parser :: Parser Char [Datum]
-parser = datums `discard` eof
+program :: Parser Char [Datum]
+program = datums `discard` eof
 
 datums :: Parser Char [Datum]
 datums = atmosphere >> (commit . many $ datum `discard` commit atmosphere)
