@@ -36,7 +36,7 @@ datum = do
    return $ quote quotes dat
  where
    quote []            = id
-   quote ('\''    :qs) = Quoted       . quote qs
+   quote ('\''    :qs) = Evaluated . ScmQuoted . quote qs
    quote ('`'     :qs) = QuasiQuoted  . quote qs
    quote (',' :'@':qs) = FlatUnQuoted . quote qs
    quote (','     :qs) = UnQuoted     . quote qs

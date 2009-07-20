@@ -6,7 +6,7 @@
 -- Context  depends on ScmValue
 --
 -- Thus they all have to be in the same module, to avoid circular dependencies.
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE BangPatterns, GeneralizedNewtypeDeriving #-}
 
 module Haschoo.Types
    ( Haschoo, runHaschoo
@@ -35,7 +35,6 @@ runHaschoo :: [Context] -> Haschoo a -> IO (ErrOr a)
 runHaschoo ctx (Haschoo h) = runErrorT $ evalStateT h ctx
 
 data Datum = Evaluated    ScmValue
-           | Quoted       Datum
            | QuasiQuoted  Datum
            | UnQuoted     Datum
            | FlatUnQuoted Datum
@@ -55,6 +54,7 @@ data ScmValue = ScmPrim    String !([Datum]    -> Haschoo   ScmValue)
               | ScmReal    !Double
               | ScmComplex !(Complex Double)
               | ScmList    ![ScmValue]
+              | ScmQuoted  Datum
 
               -- The "unspecified value" returned by IO procedures and such
               | ScmVoid
@@ -105,9 +105,14 @@ scmShow (ScmString s) = '"' : foldr ((.) . f) id s "\""
        | c == '\"' = showString "\\\""
        | otherwise = showChar c
 
+scmShow (ScmQuoted x) = let (q,y) = eatQuotes 1 x
+                         in replicate (q-1) '\'' ++ scmShowDatum y
+ where
+   eatQuotes !n (Evaluated (ScmQuoted x)) = eatQuotes (n+1) x
+   eatQuotes !n x                         = (n,x)
+
 scmShowDatum :: Datum -> String
 scmShowDatum (Evaluated v)     = scmShow v
-scmShowDatum (Quoted x)        = '\'': scmShowDatum x
 scmShowDatum (QuasiQuoted x)   = '`' : scmShowDatum x
 scmShowDatum (UnQuoted x)      = ',' : scmShowDatum x
 scmShowDatum (FlatUnQuoted x)  = ",@" ++ scmShowDatum x

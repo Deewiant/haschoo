@@ -40,7 +40,6 @@ eval (UnevaledApp xs) =
 
                 _           -> throwError "Can't apply non-function"
 
-eval (Quoted       _)   = throwError "Can't eval quoted yet"
 eval (QuasiQuoted  _)   = throwError "Can't eval quasiquoted yet"
 eval (UnQuoted     _)   = throwError "Can't eval unquoted yet"
 eval (FlatUnQuoted _)   = throwError "Can't eval flat-unquoted yet"
