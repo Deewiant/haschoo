@@ -10,8 +10,10 @@
 
 module Haschoo.Types
    ( Haschoo, runHaschoo
-   , Datum(..), ScmValue(..), scmShow, scmShowDatum
+   , Datum(..)
+   , ScmValue(..), isTrue
    , Context(..), mkContext, contextSize
+   , scmShow, scmShowDatum
    ) where
 
 import           Control.Monad.Error        (ErrorT, MonadError, runErrorT)
@@ -60,6 +62,10 @@ data ScmValue = ScmPrim    String !([Datum]    -> Haschoo   ScmValue)
               | ScmVoid
  deriving Show
 
+isTrue :: ScmValue -> Bool
+isTrue (ScmBool False) = False
+isTrue _               = True
+
 data Context = Context { idMap  :: TrieMap Char Int
                        , valMap :: IntMap ScmValue }
  deriving Show
@@ -73,6 +79,8 @@ mkContext namedVals = Context ids vals
 
 contextSize :: Context -> Int
 contextSize = IM.size . valMap
+
+---- Show functions
 
 scmShow :: ScmValue -> String
 scmShow ScmVoid       = "" -- Has no representation

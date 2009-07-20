@@ -5,7 +5,7 @@ module Haschoo.Evaluator.Primitives (context) where
 import Control.Monad.Error (throwError)
 import Control.Monad.State (get, modify)
 
-import Haschoo.Types           ( Haschoo, Datum(..), ScmValue(..)
+import Haschoo.Types           ( Haschoo, Datum(..), ScmValue(..), isTrue
                                , Context, mkContext, contextSize, scmShowDatum)
 import Haschoo.Utils           (ErrOr, compareLength, compareLengths, (.:))
 import Haschoo.Evaluator       (eval)
@@ -16,7 +16,9 @@ context = mkContext primitives
 
 primitives :: [(String, ScmValue)]
 primitives = map (\(a,b) -> (a, ScmPrim a b)) $
-   [ ("lambda", scmLambda) ]
+   [ ("lambda", scmLambda)
+   , ("quote",  scmQuote)
+   , ("if",     scmIf) ]
 
 scmLambda :: [Datum] -> Haschoo ScmValue
 scmLambda []                          = tooFewArgs "lambda"
@@ -59,3 +61,14 @@ scmLambda (UnevaledApp params : body) = do
 
 -- FIXME: (lambda x x) is valid, as is dotted-tail notation
 scmLambda _ = throwError "Invalid parameters to lambda"
+
+scmQuote :: [Datum] -> Haschoo ScmValue
+scmQuote [x] = return $ ScmQuoted x
+scmQuote []  = tooFewArgs  "quote"
+scmQuote _   = tooManyArgs "quote"
+
+scmIf :: [Datum] -> Haschoo ScmValue
+scmIf [b,x,y] = eval b >>= \t -> eval $ if isTrue t then x else y
+scmIf [b,x]   = eval b >>= \t -> if isTrue t then eval x else return ScmVoid
+scmIf (_:_:_) = tooManyArgs "if"
+scmIf _       = tooFewArgs "if"
