@@ -9,7 +9,7 @@ import Haschoo.Types           ( Haschoo, withHaschoo
                                , Datum(..), ScmValue(..), isTrue
                                , Context, mkContext, contextSize, scmShowDatum)
 import Haschoo.Utils           (ErrOr, compareLength, compareLengths, (.:))
-import Haschoo.Evaluator       (eval)
+import Haschoo.Evaluator       (eval, evalBody)
 import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
 
 context :: Context
@@ -34,7 +34,7 @@ scmLambda (UnevaledApp params : body) = return $ ScmPrim name func
                    Right ns -> do
                       let c = subContext ns args
                       case compareLength params (contextSize c) of
-                           EQ -> fmap last . withHaschoo (c:) $ mapM eval body
+                           EQ -> withHaschoo (c:) $ evalBody body
                            LT -> duplicateParam
                            GT -> error "lambda :: the impossible happened"
                    Left bad -> badParam bad

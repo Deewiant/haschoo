@@ -12,7 +12,7 @@ module Haschoo.Types
    ( Haschoo, runHaschoo, withHaschoo
    , Datum(..)
    , ScmValue(..), isTrue
-   , Context(..), mkContext, contextSize
+   , Context(..), mkContext, addToContext, contextSize
    , scmShow, scmShowDatum
    ) where
 
@@ -87,6 +87,15 @@ mkContext namedVals = Context ids vals
    key   = zip [0..]
    vals  = IM.fromList .            key . map snd $ namedVals
    ids   = TM.fromList . map swap . key . map fst $ namedVals
+
+addToContext :: String -> ScmValue -> Context -> Context
+addToContext name val (Context ids vals) =
+   let newId = fmap ((+1) . fst . fst) (IM.maxViewWithKey vals)
+    in case newId of
+            Just n  -> Context (TM.insert' name n ids)
+                               (IM.insert  n val vals)
+            Nothing ->
+               error "addToContext :: the impossible happened: empty context"
 
 contextSize :: Context -> Int
 contextSize = IM.size . valMap
