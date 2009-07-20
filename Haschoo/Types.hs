@@ -1,14 +1,24 @@
 -- File created: 2009-07-11 21:47:19
 
--- ScmValue depends on Datum and Context
+-- ScmValue depends on Datum and Haschoo
 -- Datum    depends on ScmValue
+-- Haschoo  depends on Context
 -- Context  depends on ScmValue
 --
 -- Thus they all have to be in the same module, to avoid circular dependencies.
-module Haschoo.Types where
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-import           Data.Complex (Complex((:+)))
-import           Data.IntMap  (IntMap)
+module Haschoo.Types
+   ( Haschoo, runHaschoo
+   , Datum(..), ScmValue(..), scmShow, scmShowDatum
+   , Context(..), mkContext, contextSize
+   ) where
+
+import           Control.Monad.Error        (ErrorT, MonadError, runErrorT)
+import           Control.Monad.State.Strict (StateT, MonadState, evalStateT)
+import           Control.Monad.Trans        (MonadIO)
+import           Data.Complex               (Complex((:+)))
+import           Data.IntMap                (IntMap)
 import qualified Data.IntMap as IM
 import           Data.ListTrie.Patricia.Map.Enum (TrieMap)
 import qualified Data.ListTrie.Patricia.Map.Enum as TM
@@ -16,6 +26,13 @@ import           Data.Ratio          (numerator, denominator)
 import           Text.Show.Functions ()
 
 import Haschoo.Utils (ErrOr, swap, showScmList)
+
+-- Our main monad
+newtype Haschoo a = Haschoo (StateT [Context] (ErrorT String IO) a)
+   deriving (Functor, Monad, MonadIO, MonadState [Context], MonadError String)
+
+runHaschoo :: [Context] -> Haschoo a -> IO (ErrOr a)
+runHaschoo ctx (Haschoo h) = runErrorT $ evalStateT h ctx
 
 data Datum = Evaluated    ScmValue
            | Quoted       Datum
@@ -28,8 +45,8 @@ data Datum = Evaluated    ScmValue
            | DottedList   [Datum] Datum
  deriving Show
 
-data ScmValue = ScmPrim    String !([Context] -> [Datum]    -> ErrOr ScmValue)
-              | ScmFunc    String !(             [ScmValue] -> ErrOr ScmValue)
+data ScmValue = ScmPrim    String !([Datum]    -> Haschoo   ScmValue)
+              | ScmFunc    String !([ScmValue] -> IO (ErrOr ScmValue))
               | ScmBool    !Bool
               | ScmChar    !Char
               | ScmString  !String

@@ -1,9 +1,11 @@
 -- File created: 2009-07-19 18:41:22
 
+{-# LANGUAGE FlexibleContexts #-}
+
 module Haschoo.Evaluator.Utils where
 
-import Haschoo.Utils (ErrOr)
+import Control.Monad.Error (MonadError, throwError)
 
-tooFewArgs, tooManyArgs :: String -> ErrOr a
-tooFewArgs  = fail . ("Too few arguments to " ++)
-tooManyArgs = fail . ("Too many arguments to " ++)
+tooFewArgs, tooManyArgs :: MonadError String m => String -> m a
+tooFewArgs  = throwError . ("Too few arguments to " ++)
+tooManyArgs = throwError . ("Too many arguments to " ++)

@@ -2,37 +2,47 @@
 
 module Haschoo.Evaluator where
 
-import           Control.Monad (liftM2, msum)
+import           Control.Monad       (liftM2, msum)
+import           Control.Monad.Error (throwError)
+import           Control.Monad.State (get)
+import           Control.Monad.Trans (liftIO)
 import qualified Data.IntMap as IM
 import qualified Data.ListTrie.Patricia.Map.Enum as TM
 
-import Haschoo.Types (Datum(..), ScmValue(ScmPrim, ScmFunc), Context(..))
-import Haschoo.Utils (ErrOr)
+import Haschoo.Types   ( Haschoo, Datum(..), ScmValue(ScmPrim, ScmFunc)
+                       , idMap, valMap)
+import Haschoo.Utils   (ErrOr)
 
-eval :: [Context] -> Datum -> ErrOr ScmValue
-eval _   (Evaluated  v) = Right v
-eval ctx (UnevaledId s) =
+eval :: Datum -> Haschoo ScmValue
+eval (Evaluated  v) = return v
+eval (UnevaledId s) = do
+   ctx <- get
    case msum $ map (liftM2 fmap (,) (TM.lookup s . idMap)) ctx of
         Nothing    -> fail $ "Unbound identifier " ++ s
         Just (c,i) -> case IM.lookup i (valMap c) of
-                           Nothing -> fail $ "Internal error looking up " ++ s
-                           Just v  -> Right v
+                           Just v  -> return v
+                           Nothing ->
+                              throwError $ "Internal error looking up " ++ s
 
-eval ctx (UnevaledApp xs) =
+eval (UnevaledApp xs) =
    case xs of
         []   -> fail "Empty application"
-        y:ys ->
-           case eval ctx y of
-                Left  s             -> fail s
-                Right (ScmPrim _ f) -> f ctx ys
-                Right (ScmFunc _ f) -> case mapM (eval ctx) ys of
-                                            Left  s    -> fail s
-                                            Right args -> f args
-                Right _             -> fail "Can't apply non-function"
+        y:ys -> do
+           evaledHead <- eval y
+           case evaledHead of
+                ScmPrim _ f -> f ys
+                ScmFunc _ f -> do
+                   args   <- mapM eval ys
+                   result <- liftIO $ f args
+                   case result of
+                        Left  s   -> throwError s
+                        Right val -> return val
 
-eval _ (Quoted       _)   = fail "Can't eval quoted yet"
-eval _ (QuasiQuoted  _)   = fail "Can't eval quasiquoted yet"
-eval _ (UnQuoted     _)   = fail "Can't eval unquoted yet"
-eval _ (FlatUnQuoted _)   = fail "Can't eval flat-unquoted yet"
-eval _ (UnevaledVec  _)   = fail "Can't eval vector yet"
-eval _ (DottedList   _ _) = fail "Can't eval dotted yet"
+                _           -> throwError "Can't apply non-function"
+
+eval (Quoted       _)   = throwError "Can't eval quoted yet"
+eval (QuasiQuoted  _)   = throwError "Can't eval quasiquoted yet"
+eval (UnQuoted     _)   = throwError "Can't eval unquoted yet"
+eval (FlatUnQuoted _)   = throwError "Can't eval flat-unquoted yet"
+eval (UnevaledVec  _)   = throwError "Can't eval vector yet"
+eval (DottedList   _ _) = throwError "Can't eval dotted yet"

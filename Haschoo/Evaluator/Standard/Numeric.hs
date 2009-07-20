@@ -20,7 +20,7 @@ import           Haschoo.Utils           (ErrOr, allM, ($<), (.:))
 import           Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
 
 procedures :: [(String, ScmValue)]
-procedures = map (\(a,b) -> (a, ScmFunc a b)) $
+procedures = map (\(a,b) -> (a, ScmFunc a (return . b))) $
    [ ("number?",   fmap ScmBool . scmIsNumber)
    , ("complex?",  fmap ScmBool . scmIsNumber)
    , ("real?",     fmap ScmBool . scmIsReal)

@@ -2,7 +2,10 @@
 
 module Haschoo.Evaluator.Primitives (context) where
 
-import Haschoo.Types           ( Datum(..), ScmValue(..)
+import Control.Monad.Error (throwError)
+import Control.Monad.State (get, modify)
+
+import Haschoo.Types           ( Haschoo, Datum(..), ScmValue(..)
                                , Context, mkContext, contextSize, scmShowDatum)
 import Haschoo.Utils           (ErrOr, compareLength, compareLengths, (.:))
 import Haschoo.Evaluator       (eval)
@@ -15,21 +18,24 @@ primitives :: [(String, ScmValue)]
 primitives = map (\(a,b) -> (a, ScmPrim a b)) $
    [ ("lambda", scmLambda) ]
 
-scmLambda :: [Context] -> [Datum] -> ErrOr ScmValue
-scmLambda _   []                          = tooFewArgs "lambda"
-scmLambda _   [_]                         = tooFewArgs "lambda"
-scmLambda ctx (UnevaledApp params : body) = Right $ ScmFunc name func
+scmLambda :: [Datum] -> Haschoo ScmValue
+scmLambda []                          = tooFewArgs "lambda"
+scmLambda [_]                         = tooFewArgs "lambda"
+scmLambda (UnevaledApp params : body) = do
+   ctx <- get
+   return $ ScmPrim name func
  where
-   func args =
+   func xs = do
+      args <- mapM eval xs
       case compareLengths args params of
            EQ ->
               case paramNames of
                    Right ns ->
                       let c = subContext ns args
                        in case compareLength params (contextSize c) of
-                               EQ ->
-                                  -- FIXME: evaluate body in sequence
-                                  eval (c : ctx) (last body)
+                               EQ -> do
+                                  modify (c:)
+                                  fmap last $ mapM eval body
                                LT -> duplicateParam
                                GT -> error "lambda :: the impossible happened"
                    Left bad -> badParam bad
@@ -46,8 +52,10 @@ scmLambda ctx (UnevaledApp params : body) = Right $ ScmFunc name func
    name = "<lambda>"
    subContext = mkContext .: zip
 
-   duplicateParam = fail.concat $ ["Duplicate in parameter list of ", name]
-   badParam bad   = fail.concat $ ["Invalid parameter '", bad, "' to ", name]
+   duplicateParam =
+      throwError.concat $ ["Duplicate in parameter list of ", name]
+   badParam bad   =
+      throwError.concat $ ["Invalid parameter '", bad, "' to ", name]
 
 -- FIXME: (lambda x x) is valid, as is dotted-tail notation
-scmLambda _ _ = fail "Invalid parameters to lambda"
+scmLambda _ = throwError "Invalid parameters to lambda"
