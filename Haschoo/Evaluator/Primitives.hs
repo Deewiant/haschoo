@@ -5,7 +5,8 @@ module Haschoo.Evaluator.Primitives (context) where
 import Control.Monad.Error (throwError)
 import Control.Monad.State (get, modify)
 
-import Haschoo.Types           ( Haschoo, Datum(..), ScmValue(..), isTrue
+import Haschoo.Types           ( Haschoo, withHaschoo
+                               , Datum(..), ScmValue(..), isTrue
                                , Context, mkContext, contextSize, scmShowDatum)
 import Haschoo.Utils           (ErrOr, compareLength, compareLengths, (.:))
 import Haschoo.Evaluator       (eval)
@@ -32,14 +33,12 @@ scmLambda (UnevaledApp params : body) = do
       case compareLengths args params of
            EQ ->
               case paramNames of
-                   Right ns ->
+                   Right ns -> do
                       let c = subContext ns args
-                       in case compareLength params (contextSize c) of
-                               EQ -> do
-                                  modify (c:)
-                                  fmap last $ mapM eval body
-                               LT -> duplicateParam
-                               GT -> error "lambda :: the impossible happened"
+                      case compareLength params (contextSize c) of
+                           EQ -> fmap last . withHaschoo (c:) $ mapM eval body
+                           LT -> duplicateParam
+                           GT -> error "lambda :: the impossible happened"
                    Left bad -> badParam bad
            LT -> tooFewArgs  name
            GT -> tooManyArgs name

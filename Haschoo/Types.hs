@@ -9,23 +9,24 @@
 {-# LANGUAGE BangPatterns, GeneralizedNewtypeDeriving #-}
 
 module Haschoo.Types
-   ( Haschoo, runHaschoo
+   ( Haschoo, runHaschoo, withHaschoo
    , Datum(..)
    , ScmValue(..), isTrue
    , Context(..), mkContext, contextSize
    , scmShow, scmShowDatum
    ) where
 
-import           Control.Monad.Error        (ErrorT, MonadError, runErrorT)
-import           Control.Monad.State.Strict (StateT, MonadState, evalStateT)
-import           Control.Monad.Trans        (MonadIO)
-import           Data.Complex               (Complex((:+)))
-import           Data.IntMap                (IntMap)
+import Control.Monad.Error        (ErrorT, MonadError, runErrorT, throwError)
+import Control.Monad.State.Strict (StateT, MonadState, runStateT, evalStateT, get)
+import Control.Monad.Trans        (MonadIO, liftIO)
+import Data.Complex               (Complex((:+)))
+import Data.IntMap                (IntMap)
+import Data.ListTrie.Patricia.Map.Enum (TrieMap)
+import Data.Ratio          (numerator, denominator)
+import Text.Show.Functions ()
+
 import qualified Data.IntMap as IM
-import           Data.ListTrie.Patricia.Map.Enum (TrieMap)
 import qualified Data.ListTrie.Patricia.Map.Enum as TM
-import           Data.Ratio          (numerator, denominator)
-import           Text.Show.Functions ()
 
 import Haschoo.Utils (ErrOr, swap, showScmList)
 
@@ -35,6 +36,16 @@ newtype Haschoo a = Haschoo (StateT [Context] (ErrorT String IO) a)
 
 runHaschoo :: [Context] -> Haschoo a -> IO (ErrOr a)
 runHaschoo ctx (Haschoo h) = runErrorT $ evalStateT h ctx
+
+-- Like 'local' in MonadReader. (Not like withStateT in MonadState, which
+-- evidently does something different.)
+withHaschoo :: ([Context] -> [Context]) -> Haschoo a -> Haschoo a
+withHaschoo f h = do
+   ctx <- get
+   x <- liftIO $ runHaschoo (f ctx) h
+   case x of
+        Left  s -> throwError s
+        Right a -> return a
 
 data Datum = Evaluated    ScmValue
            | QuasiQuoted  Datum
