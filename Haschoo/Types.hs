@@ -55,6 +55,9 @@ data ScmValue = ScmPrim    String !([Datum]    -> Haschoo   ScmValue)
               | ScmReal    !Double
               | ScmComplex !(Complex Double)
               | ScmList    ![ScmValue]
+
+              -- The "unspecified value" returned by IO procedures and such
+              | ScmVoid
  deriving Show
 
 data Context = Context { idMap  :: TrieMap Char Int
@@ -72,6 +75,7 @@ contextSize :: Context -> Int
 contextSize = IM.size . valMap
 
 scmShow :: ScmValue -> String
+scmShow ScmVoid       = "" -- Has no representation
 scmShow (ScmBool b)   = '#' : if b then "t" else "f"
 scmShow (ScmPrim s _) = s
 scmShow (ScmFunc s _) = s

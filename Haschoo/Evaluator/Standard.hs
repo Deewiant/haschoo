@@ -2,11 +2,12 @@
 
 module Haschoo.Evaluator.Standard (context) where
 
-import           Haschoo.Types             (ScmValue, Context, mkContext)
+import           Haschoo.Types (ScmValue, Context, mkContext)
+import qualified Haschoo.Evaluator.Standard.IO      as IO
 import qualified Haschoo.Evaluator.Standard.Numeric as Numeric
 
 procedures :: [(String, ScmValue)]
-procedures = Numeric.procedures
+procedures = concat [IO.procedures, Numeric.procedures]
 
 context :: Context
 context = mkContext procedures
