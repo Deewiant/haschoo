@@ -18,7 +18,7 @@ eval (Evaluated  v) = return v
 eval (UnevaledId s) = do
    ctx <- get
    case msum $ map (liftM2 fmap (,) (TM.lookup s . idMap)) ctx of
-        Nothing    -> fail $ "Unbound identifier " ++ s
+        Nothing    -> fail $ "Unbound identifier '" ++ s ++ "'"
         Just (c,i) -> case IM.lookup i (valMap c) of
                            Just v  -> return v
                            Nothing ->
