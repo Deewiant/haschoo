@@ -24,9 +24,7 @@ primitives = map (\(a,b) -> (a, ScmPrim a b)) $
 scmLambda :: [Datum] -> Haschoo ScmValue
 scmLambda []                          = tooFewArgs "lambda"
 scmLambda [_]                         = tooFewArgs "lambda"
-scmLambda (UnevaledApp params : body) = do
-   ctx <- get
-   return $ ScmPrim name func
+scmLambda (UnevaledApp params : body) = return $ ScmPrim name func
  where
    func xs = do
       args <- mapM eval xs
