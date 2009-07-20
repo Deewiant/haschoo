@@ -22,7 +22,7 @@ compareLength _      n | n < 0 = GT
 compareLength []     0         = EQ
 compareLength []     _         = LT
 compareLength (_:_)  0         = GT
-compareLength (_:as) n         = compareLength as n
+compareLength (_:as) n         = compareLength as (n-1)
 
 showScmList :: (a -> String) -> [a] -> String
 showScmList f xs = concat ["(", intercalate " " (map f xs), ")"]
