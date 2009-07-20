@@ -72,12 +72,23 @@ eval (UnevaledVec  _)   = throwError "Can't eval vector yet"
 eval (DottedList   _ _) = throwError "Can't eval dotted yet"
 
 scmDefinition :: [Datum] -> Haschoo ()
-scmDefinition [UnevaledId var, expr] = eval expr >>= modify . f
+scmDefinition [UnevaledId var, expr] = define var expr
+
+scmDefinition (UnevaledApp (UnevaledId func : params) : body) =
+   define func . UnevaledApp $ UnevaledId "lambda" : UnevaledApp params : body
+
+scmDefinition (DottedList (UnevaledId func : params) final : body) =
+   define func . UnevaledApp $ UnevaledId "lambda"
+                               : (if null params
+                                     then final
+                                     else DottedList params final)
+                               : body
+
+scmDefinition (_:_:_) = throwError "define :: expected identifier"
+scmDefinition _       = tooFewArgs "define"
+
+define :: String -> Datum -> Haschoo ()
+define var body = eval body >>= modify . f
  where
    f e (c:cs) = addToContext var e c : cs
    f _ []     = error "define :: the impossible happened: empty context stack"
-
-scmDefinition (_:_:_)   =
-   throwError "Unimplemented or erroneous definition style"
-scmDefinition (_:_:_:_) = tooManyArgs "define"
-scmDefinition _         = tooFewArgs "define"
