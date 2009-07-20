@@ -3,11 +3,13 @@
 module Haschoo.Evaluator.Primitives (context) where
 
 import Control.Monad.Error (throwError)
-import Control.Monad.State (get, modify)
+import Control.Monad.State (get, put)
 
 import Haschoo.Types           ( Haschoo, withHaschoo
                                , Datum(..), ScmValue(..), isTrue
-                               , Context, mkContext, contextSize, scmShowDatum)
+                               , Context, mkContext, contextSize
+                               , addToContext, contextLookup
+                               , scmShowDatum)
 import Haschoo.Utils           (ErrOr, compareLength, compareLengths, (.:))
 import Haschoo.Evaluator       (eval, evalBody)
 import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
@@ -19,7 +21,8 @@ primitives :: [(String, ScmValue)]
 primitives = map (\(a,b) -> (a, ScmPrim a b)) $
    [ ("lambda", scmLambda)
    , ("quote",  scmQuote)
-   , ("if",     scmIf) ]
+   , ("if",     scmIf)
+   , ("set!",   scmSet) ]
 
 scmLambda :: [Datum] -> Haschoo ScmValue
 scmLambda []                          = tooFewArgs "lambda"
@@ -69,3 +72,17 @@ scmIf [b,x,y] = eval b >>= \t -> eval $ if isTrue t then x else y
 scmIf [b,x]   = eval b >>= \t -> if isTrue t then eval x else return ScmVoid
 scmIf (_:_:_) = tooManyArgs "if"
 scmIf _       = tooFewArgs "if"
+
+scmSet :: [Datum] -> Haschoo ScmValue
+scmSet [UnevaledId var, expr] = do
+   e    <- eval expr
+   ctx  <- get
+   ctx' <- f e ctx
+   put ctx'
+   return ScmVoid
+ where
+   f e (c:cs) = case contextLookup var c of
+                     Just _  -> return $ addToContext var e c : cs
+                     Nothing -> throwError $ "Unbound identifier '" ++ var ++ "'"
+
+   f e []     = error "set! :: the impossible happened: empty context stack"

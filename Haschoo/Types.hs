@@ -12,10 +12,11 @@ module Haschoo.Types
    ( Haschoo, runHaschoo, withHaschoo
    , Datum(..)
    , ScmValue(..), isTrue
-   , Context(..), mkContext, addToContext, contextSize
+   , Context(..), mkContext, addToContext, contextLookup, contextSize
    , scmShow, scmShowDatum
    ) where
 
+import Control.Monad              (liftM2)
 import Control.Monad.Error        (ErrorT, MonadError, runErrorT, throwError)
 import Control.Monad.State.Strict (StateT, MonadState, runStateT, evalStateT, get)
 import Control.Monad.Trans        (MonadIO, liftIO)
@@ -96,6 +97,9 @@ addToContext name val (Context ids vals) =
                                (IM.insert  n val vals)
             Nothing ->
                error "addToContext :: the impossible happened: empty context"
+
+contextLookup :: String -> Context -> Maybe (Context, Int)
+contextLookup s = liftM2 fmap (,) (TM.lookup s . idMap)
 
 contextSize :: Context -> Int
 contextSize = IM.size . valMap

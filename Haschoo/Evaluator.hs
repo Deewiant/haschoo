@@ -2,7 +2,7 @@
 
 module Haschoo.Evaluator (evalToplevel, evalBody, eval) where
 
-import           Control.Monad       (liftM2, msum)
+import           Control.Monad       (msum)
 import           Control.Monad.Error (throwError)
 import           Control.Monad.State (get, modify)
 import           Control.Monad.Trans (liftIO)
@@ -11,7 +11,7 @@ import qualified Data.ListTrie.Patricia.Map.Enum as TM
 
 import Haschoo.Types           ( Haschoo, Datum(..)
                                , ScmValue(ScmPrim, ScmFunc, ScmVoid)
-                               , idMap, valMap, addToContext)
+                               , idMap, valMap, addToContext, contextLookup)
 import Haschoo.Utils           (ErrOr)
 import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
 
@@ -42,7 +42,7 @@ eval :: Datum -> Haschoo ScmValue
 eval (Evaluated  v) = return v
 eval (UnevaledId s) = do
    ctx <- get
-   case msum $ map (liftM2 fmap (,) (TM.lookup s . idMap)) ctx of
+   case msum $ map (contextLookup s) ctx of
         Nothing    -> fail $ "Unbound identifier '" ++ s ++ "'"
         Just (c,i) -> case IM.lookup i (valMap c) of
                            Just v  -> return v
