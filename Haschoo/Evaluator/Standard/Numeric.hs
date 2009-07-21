@@ -30,7 +30,7 @@ procedures = map (\(a,b) -> (a, ScmFunc a (return . b))) $
    , "exact?"   $< id &&& fmap  ScmBool        .: scmIsExact
    , "inexact?" $< id &&& fmap (ScmBool . not) .: scmIsExact
 
-   , "="  $< id &&& fmap ScmBool .: scmCompare (==)
+   , ("=", fmap ScmBool . scmNumEq)
    , "<"  $< id &&& fmap ScmBool .: scmCompare (<)
    , ">"  $< id &&& fmap ScmBool .: scmCompare (>)
    , "<=" $< id &&& fmap ScmBool .: scmCompare (<=)
@@ -118,6 +118,23 @@ scmIsExact s [_]               = notNum s
 scmIsExact s _                 = tooManyArgs s
 
 ---- Comparison
+
+scmNumEq :: [ScmValue] -> ErrOr Bool
+scmNumEq [] = tooFewArgs "="
+scmNumEq xs = allM f . (zip`ap`tail) $ xs
+ where
+   f (a,b) = if isNumeric a && isNumeric b
+                then Right $ numEq a b
+                else notNum "="
+
+numEq :: ScmValue -> ScmValue -> Bool
+numEq a b =
+   case pairScmComplex a b of
+        Right (ScmInt     a, ScmInt     b) -> a == b
+        Right (ScmRat     a, ScmRat     b) -> a == b
+        Right (ScmReal    a, ScmReal    b) -> a == b
+        Right (ScmComplex a, ScmComplex b) -> a == b
+        _ -> error "numEq :: the impossible happened"
 
 scmCompare :: (forall a. Real a => a -> a -> Bool)
            -> String -> [ScmValue] -> ErrOr Bool
