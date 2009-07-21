@@ -9,10 +9,9 @@ import Control.Monad.Trans (liftIO)
 import Data.IORef          (IORef, newIORef, readIORef, modifyIORef)
 
 import Haschoo.Types           ( Haschoo, withHaschoo
-                               , Datum(..), ScmValue(..), isTrue
+                               , ScmValue(..), scmShow, isTrue
                                , Context, mkContext, contextSize
-                               , addToContext, contextLookup
-                               , scmShowDatum)
+                               , addToContext, contextLookup)
 import Haschoo.Utils           (compareLength, compareLengths, (.:))
 import Haschoo.Evaluator       (eval, evalBody)
 import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
@@ -27,19 +26,19 @@ primitives = map (\(a,b) -> (a, ScmPrim a b)) $
    , ("if",     scmIf)
    , ("set!",   scmSet) ]
 
-scmLambda :: [Datum] -> Haschoo ScmValue
-scmLambda []                                     = tooFewArgs "lambda"
-scmLambda [_]                                    = tooFewArgs "lambda"
-scmLambda (UnevaledApp ps                : body) = mkΛ ps  Nothing body <$> get
-scmLambda (                UnevaledId t  : body) = mkΛ [] (Just t) body <$> get
-scmLambda (DottedList  ps (UnevaledId t) : body) = mkΛ ps (Just t) body <$> get
+scmLambda :: [ScmValue] -> Haschoo ScmValue
+scmLambda []                                          = tooFewArgs "lambda"
+scmLambda [_]                                         = tooFewArgs "lambda"
+scmLambda (ScmList       ps                   : body) = mkΛ ps  Nothing body
+scmLambda (                  ScmIdentifier t  : body) = mkΛ [] (Just t) body
+scmLambda (ScmDottedList ps (ScmIdentifier t) : body) = mkΛ ps (Just t) body
 
 scmLambda _ = throwError "Invalid parameters to lambda"
 
-mkΛ :: [Datum] -> Maybe String -> [Datum] -> [IORef Context] -> ScmValue
-mkΛ formals tailParams body ctx = ScmPrim name func
+mkΛ :: [ScmValue] -> Maybe String -> [ScmValue] -> Haschoo ScmValue
+mkΛ formals tailParams body = ScmPrim name . func <$> get
  where
-   func = \xs -> do
+   func ctx = \xs -> do
       case compareLengths xs formals of
            (LT,_)      -> tooFewArgs name
            (order,len) -> do
@@ -70,8 +69,8 @@ mkΛ formals tailParams body ctx = ScmPrim name func
 
       paramNames = mapM f formals
        where
-         f (UnevaledId x) = Right x
-         f x              = Left (scmShowDatum x)
+         f (ScmIdentifier x) = Right x
+         f x                 = Left (scmShow x)
 
    -- TODO: these should be cached somewhere somehow, not fully recreated every
    -- time: we just need to substitute the parameter values
@@ -83,20 +82,19 @@ mkΛ formals tailParams body ctx = ScmPrim name func
    badParam bad   =
       throwError.concat $ ["Invalid parameter '", bad, "' to ", name]
 
-
-scmQuote :: [Datum] -> Haschoo ScmValue
-scmQuote [x] = return $ ScmQuoted x
+scmQuote :: [ScmValue] -> Haschoo ScmValue
+scmQuote [x] = return x
 scmQuote []  = tooFewArgs  "quote"
 scmQuote _   = tooManyArgs "quote"
 
-scmIf :: [Datum] -> Haschoo ScmValue
+scmIf :: [ScmValue] -> Haschoo ScmValue
 scmIf [b,x,y] = eval b >>= \t -> eval $ if isTrue t then x else y
 scmIf [b,x]   = eval b >>= \t -> if isTrue t then eval x else return ScmVoid
 scmIf (_:_:_) = tooManyArgs "if"
 scmIf _       = tooFewArgs "if"
 
-scmSet :: [Datum] -> Haschoo ScmValue
-scmSet [UnevaledId var, expr] = do
+scmSet :: [ScmValue] -> Haschoo ScmValue
+scmSet [ScmIdentifier var, expr] = do
    e    <- eval expr
    ctx  <- get
    ctx' <- f e ctx

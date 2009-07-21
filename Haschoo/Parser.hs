@@ -14,48 +14,50 @@ import Text.ParserCombinators.Poly.Plain
    ( Parser, next, apply, satisfy, discard, commit, adjustErr, onFail, reparse
    , many, many1, oneOf, oneOf', bracket, indent, optional)
 
-import Haschoo.Types (Datum(..), ScmValue(..))
+import Haschoo.Types (ScmValue(..))
 import Haschoo.Utils (void)
 
-program :: Parser Char [Datum]
-program = datums `discard` eof
+program :: Parser Char [ScmValue]
+program = values `discard` eof
 
-datums :: Parser Char [Datum]
-datums = atmosphere >> (commit . many $ datum `discard` commit atmosphere)
+values :: Parser Char [ScmValue]
+values = atmosphere >> (commit . many $ value `discard` commit atmosphere)
 
-datum :: Parser Char Datum
-datum = do
+value :: Parser Char ScmValue
+value = do
    quotes <- concat <$> many (oneOf (map string ["'", "`", ",@", ","])
                                  `discard` commit atmosphere)
 
-   dat <- oneOf' [ ("identifier", ident)
+   val <- oneOf' [ ("identifier", ident)
                  , ("list", list)
                  , ("vector", vector)
-                 , ("value", value) ]
+                 , ("bool", bool)
+                 , ("number", number 10)
+                 , ("character", character)
+                 , ("string", quotedString) ]
 
-   return $ quote quotes dat
+   return $ quote quotes val
  where
    quote []            = id
-   quote ('\''    :qs) = Evaluated . ScmQuoted . quote qs
-   quote ('`'     :qs) = QuasiQuoted  . quote qs
-   quote (',' :'@':qs) = FlatUnQuoted . quote qs
-   quote (','     :qs) = UnQuoted     . quote qs
-   quote _             = error "Parser.quote :: internal error"
+   quote ('\''    :qs) = quoteWith "quote"            qs
+   quote ('`'     :qs) = quoteWith "quasiquote"       qs
+   quote (',' :'@':qs) = quoteWith "unquote-splicing" qs
+   quote (','     :qs) = quoteWith "unquote"          qs
+   quote _             = error "Parser.quote :: the impossible happened"
 
-value :: Parser Char Datum
-value = Evaluated <$> oneOf [bool, number 10, character, quotedString]
+   quoteWith s qs = ScmList . (ScmIdentifier s :) . (:[]) . quote qs
 
-ident :: Parser Char Datum
+ident :: Parser Char ScmValue
 ident = do
    x <- oneOf [peculiar,ordinary]
    delimiter
-   return x
+   return (ScmIdentifier x)
  where
-   peculiar = UnevaledId <$> oneOf [return <$> pElem "+-", string "..."]
+   peculiar = oneOf [return <$> pElem "+-", string "..."]
    ordinary = do
       x  <- pElem initial
       xs <- many (pElem (initial ++ "+-.@" ++ ['0'..'9']))
-      return$ UnevaledId (x:xs)
+      return (x:xs)
     where
       initial = ['a'..'z'] ++ ['A'..'Z'] ++ "!$%&*/:<=>?^_~"
 
@@ -80,23 +82,24 @@ quotedString =
                                 `usingError` "Invalid escaped character"
                , satisfy (/= '"') ])
 
-list :: Parser Char Datum
+list :: Parser Char ScmValue
 list =
    bracket (one '(') (atmosphere >> one ')') $ do
-      dats <- datums `adjustErr` (("In a list:\n"++) . indent 2)
-      if null dats
-         then return$ UnevaledApp dats
+      vals <- values `adjustErr` (("In a list:\n"++) . indent 2)
+      if null vals
+         then return$ ScmList vals
          else do
             atmosphere
             dot <- optional (one '.')
             if isJust dot
-               then DottedList dats <$> (commit atmosphere >> datum)
-               else return$ UnevaledApp dats
+               then ScmDottedList vals <$> (commit atmosphere >> value)
+               else return$ ScmList vals
 
-vector :: Parser Char Datum
+vector :: Parser Char ScmValue
 vector = do
    one '#'
-   UnevaledVec <$> bracket (one '(') (atmosphere >> one ')') datums
+   error "vectors not yet supported!"
+   --ScmVector <$> bracket (one '(') (atmosphere >> one ')') values
 
 number :: Int -> Parser Char ScmValue
 number defRadix = do

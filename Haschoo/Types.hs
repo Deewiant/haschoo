@@ -1,7 +1,6 @@
 -- File created: 2009-07-11 21:47:19
 
--- ScmValue depends on Datum and Haschoo
--- Datum    depends on ScmValue
+-- ScmValue depends on Haschoo
 -- Haschoo  depends on Context
 -- Context  depends on ScmValue
 --
@@ -10,10 +9,9 @@
 
 module Haschoo.Types
    ( Haschoo, runHaschoo, withHaschoo
-   , Datum(..)
    , ScmValue(..), isTrue
    , Context(..), mkContext, addToContext, contextLookup, contextSize
-   , scmShow, scmShowDatum
+   , scmShow
    ) where
 
 import Control.Monad                   (liftM2)
@@ -53,32 +51,22 @@ withHaschoo f h = do
         Left  s -> throwError s
         Right a -> return a
 
-data Datum = Evaluated    ScmValue
-           | QuasiQuoted  Datum
-           | UnQuoted     Datum
-           | FlatUnQuoted Datum
-           | UnevaledId   String
-           | UnevaledApp  [Datum]
-           | UnevaledVec  [Datum]
-           | DottedList   [Datum] Datum
- deriving Show
+data ScmValue = ScmPrim       String !([ScmValue] -> Haschoo   ScmValue)
+              | ScmFunc       String !([ScmValue] -> IO (ErrOr ScmValue))
+              | ScmBool       !Bool
+              | ScmChar       !Char
+              | ScmString     !String
+              | ScmInt        !Integer
+              | ScmRat        !Rational
+              | ScmReal       !Double
+              | ScmComplex    !(Complex Double)
+              | ScmIdentifier !String
+              | ScmPair       !ScmValue !ScmValue
 
-data ScmValue = ScmPrim    String !([Datum]    -> Haschoo   ScmValue)
-              | ScmFunc    String !([ScmValue] -> IO (ErrOr ScmValue))
-              | ScmBool    !Bool
-              | ScmChar    !Char
-              | ScmString  !String
-              | ScmInt     !Integer
-              | ScmRat     !Rational
-              | ScmReal    !Double
-              | ScmComplex !(Complex Double)
-              | ScmQuoted  Datum
-
-              -- All lists created by the Scheme program
-              | ScmPair    !ScmValue !ScmValue
-
-              -- Constant lists
-              | ScmList    ![ScmValue]
+              -- These two are only for literal lists, appearing only directly
+              -- from the parser
+              | ScmList       ![ScmValue]
+              | ScmDottedList ![ScmValue] !ScmValue -- The list is never empty
 
               -- The "unspecified value" returned by IO procedures and such
               | ScmVoid
@@ -114,17 +102,18 @@ contextSize = IM.size . valMap
 ---- Show functions
 
 scmShow :: ScmValue -> String
-scmShow ScmVoid       = "" -- Has no representation
-scmShow (ScmBool b)   = '#' : if b then "t" else "f"
-scmShow (ScmPrim s _) = s
-scmShow (ScmFunc s _) = s
-scmShow (ScmList xs)  = showScmList scmShow xs
-scmShow (ScmInt n)    = show n
+scmShow ScmVoid           = "" -- Has no representation
+scmShow (ScmBool b)       = '#' : if b then "t" else "f"
+scmShow (ScmPrim s _)     = s
+scmShow (ScmFunc s _)     = s
+scmShow (ScmIdentifier s) = s
+scmShow (ScmList xs)      = showScmList scmShow xs
+scmShow (ScmInt n)        = show n
 scmShow (ScmReal n)
    | isNaN      n = "+nan.#"
    | isInfinite n = (if n < 0 then '-' else '+') : "inf.#"
    | otherwise    = show n
-scmShow (ScmRat n)    =
+scmShow (ScmRat n) =
    concat [show (numerator n), "/", show (denominator n)]
 
 scmShow (ScmComplex (a :+ b)) =
@@ -144,31 +133,10 @@ scmShow (ScmString s) = '"' : foldr ((.) . f) id s "\""
        | c == '\"' = showString "\\\""
        | otherwise = showChar c
 
-scmShow (ScmQuoted d) = let (q,y) = eatQuotes 1 d
-                         in replicate (q-1) '\'' ++ scmShowDatum y
- where
-   eatQuotes !n (Evaluated (ScmQuoted x)) = eatQuotes (n+1) x
-   eatQuotes !n x                         = (n,x)
+scmShow (ScmDottedList as b) =
+   concat [init (showScmList scmShow as), " . ", scmShow b, ")"]
 
-scmShow (ScmPair car cdr) = '(' : go car cdr
+scmShow (ScmPair car cdr) = '(' : scmShow car ++ go cdr
  where
-   -- XXX: Our way of representing symbols seems to be painfully poor
-   go a (ScmQuoted (UnevaledApp []))  = scmShow a ++ ")"
-   go a (ScmQuoted (UnevaledApp xs))  = tail.scmShowDatum $
-                                           UnevaledApp (Evaluated a : xs)
-   go a (ScmQuoted (DottedList as b)) = tail.scmShowDatum $
-                                           DottedList (Evaluated a : as) b
-   go a (ScmPair x y)                 = scmShow a ++ " " ++ go x y
-   go a l@(ScmList _)                 = scmShow a ++ " " ++ tail (scmShow l)
-   go a b                             = scmShow a ++ " . " ++ scmShow b ++ ")"
-
-scmShowDatum :: Datum -> String
-scmShowDatum (Evaluated v)     = scmShow v
-scmShowDatum (QuasiQuoted x)   = '`' : scmShowDatum x
-scmShowDatum (UnQuoted x)      = ',' : scmShowDatum x
-scmShowDatum (FlatUnQuoted x)  = ",@" ++ scmShowDatum x
-scmShowDatum (UnevaledId s)    = s
-scmShowDatum (UnevaledApp xs)  = showScmList scmShowDatum xs
-scmShowDatum (UnevaledVec xs)  = '#' : showScmList scmShowDatum xs
-scmShowDatum (DottedList xs x) =
-   concat [init (showScmList scmShowDatum xs), " . ", scmShowDatum x, ")"]
+   go (ScmPair x y) = " " ++ scmShow x ++ go y
+   go b             = " . " ++ scmShow b ++ ")"

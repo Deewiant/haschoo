@@ -9,8 +9,10 @@ import           Control.Monad.Trans (liftIO)
 import           Data.IORef          (readIORef, modifyIORef)
 import qualified Data.IntMap as IM
 
-import Haschoo.Types           ( Haschoo, Datum(..)
-                               , ScmValue(ScmPrim, ScmFunc, ScmVoid)
+import Haschoo.Types           ( Haschoo
+                               , ScmValue( ScmPrim, ScmFunc, ScmVoid
+                                         , ScmList, ScmIdentifier
+                                         , ScmDottedList)
                                , valMap, addToContext, contextLookup)
 import Haschoo.Utils           (lazyMapM, modifyM)
 import Haschoo.Evaluator.Utils (tooFewArgs)
@@ -28,19 +30,18 @@ import Haschoo.Evaluator.Utils (tooFewArgs)
 -- separately here instead of being ordinary primitives.
 
 -- TODO: syntax definitions
-evalToplevel :: [Datum] -> Haschoo ScmValue
+evalToplevel :: [ScmValue] -> Haschoo ScmValue
 evalToplevel = evalBody
 
-evalBody :: [Datum] -> Haschoo ScmValue
-evalBody (UnevaledApp (UnevaledId "define":xs) : ds) =
+evalBody :: [ScmValue] -> Haschoo ScmValue
+evalBody (ScmList (ScmIdentifier "define":xs) : ds) =
    scmDefinition xs >> evalBody ds
 
 evalBody ds@(_:_) = fmap last . mapM eval $ ds
 evalBody []       = return ScmVoid
 
-eval :: Datum -> Haschoo ScmValue
-eval (Evaluated  v) = return v
-eval (UnevaledId s) = do
+eval :: ScmValue -> Haschoo ScmValue
+eval (ScmIdentifier s) = do
    ctx <- get
    lookups <- lazyMapM (fmap (contextLookup s) . readIORef) ctx
    case msum lookups of
@@ -50,7 +51,7 @@ eval (UnevaledId s) = do
                            Nothing ->
                               throwError $ "Internal error looking up " ++ s
 
-eval (UnevaledApp xs) =
+eval (ScmList xs) =
    case xs of
         []   -> fail "Empty application"
         y:ys -> do
@@ -66,29 +67,26 @@ eval (UnevaledApp xs) =
 
                 _           -> throwError "Can't apply non-function"
 
-eval (QuasiQuoted  _)   = throwError "Can't eval quasiquoted yet"
-eval (UnQuoted     _)   = throwError "Can't eval unquoted yet"
-eval (FlatUnQuoted _)   = throwError "Can't eval flat-unquoted yet"
-eval (UnevaledVec  _)   = throwError "Can't eval vector yet"
-eval (DottedList   _ _) = throwError "Can't eval dotted yet"
+eval (ScmDottedList _ _) = throwError "Ill-formed application: no dots allowed"
+eval v                   = return v
 
-scmDefinition :: [Datum] -> Haschoo ()
-scmDefinition [UnevaledId var, expr] = define var expr
+scmDefinition :: [ScmValue] -> Haschoo ()
+scmDefinition [ScmIdentifier var, expr] = define var expr
 
-scmDefinition (UnevaledApp (UnevaledId func : params) : body) =
-   define func . UnevaledApp $ UnevaledId "lambda" : UnevaledApp params : body
+scmDefinition (ScmList (ScmIdentifier func : params) : body) =
+   define func . ScmList $ ScmIdentifier "lambda" : ScmList params : body
 
-scmDefinition (DottedList (UnevaledId func : params) final : body) =
-   define func . UnevaledApp $ UnevaledId "lambda"
-                               : (if null params
-                                     then final
-                                     else DottedList params final)
-                               : body
+scmDefinition (ScmDottedList (ScmIdentifier func : params) final : body) =
+   define func . ScmList $ ScmIdentifier "lambda"
+                           : (if null params
+                                 then final
+                                 else ScmDottedList params final)
+                           : body
 
 scmDefinition (_:_:_) = throwError "define :: expected identifier"
 scmDefinition _       = tooFewArgs "define"
 
-define :: String -> Datum -> Haschoo ()
+define :: String -> ScmValue -> Haschoo ()
 define var body = eval body >>= modifyM . f
  where
    f e (c:cs) = do
