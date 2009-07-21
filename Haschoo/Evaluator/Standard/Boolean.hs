@@ -2,7 +2,7 @@
 
 module Haschoo.Evaluator.Standard.Boolean (procedures) where
 
-import Haschoo.Types           (ScmValue(..))
+import Haschoo.Types           (ScmValue(..), isTrue)
 import Haschoo.Utils           (ErrOr)
 import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
 
@@ -12,10 +12,9 @@ procedures = map (\(a,b) -> (a, ScmFunc a (return. b))) $
    , ("boolean?", fmap ScmBool . scmIsBoolean) ]
 
 scmNot, scmIsBoolean :: [ScmValue] -> ErrOr Bool
-scmNot [ScmBool False] = Right True
-scmNot [_]             = Right False
-scmNot []              = tooFewArgs  "not"
-scmNot _               = tooManyArgs "not"
+scmNot [x] = Right . not . isTrue $ x
+scmNot []  = tooFewArgs  "not"
+scmNot _   = tooManyArgs "not"
 
 scmIsBoolean [ScmBool _] = Right True
 scmIsBoolean [_]         = Right False
