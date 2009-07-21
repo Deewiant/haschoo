@@ -83,6 +83,6 @@ scmSet [UnevaledId var, expr] = do
  where
    f e (c:cs) = case contextLookup var c of
                      Just _  -> return $ addToContext var e c : cs
-                     Nothing -> throwError $ "Unbound identifier '" ++ var ++ "'"
+                     Nothing -> fmap (c:) (f e cs)
 
-   f e []     = error "set! :: the impossible happened: empty context stack"
+   f e []     = throwError $ "Unbound identifier '" ++ var ++ "'"
