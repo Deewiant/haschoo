@@ -28,8 +28,8 @@ import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
 -- separately here instead of being ordinary primitives.
 
 -- TODO: syntax definitions
-evalToplevel :: Datum -> Haschoo ScmValue
-evalToplevel = evalBody . return
+evalToplevel :: [Datum] -> Haschoo ScmValue
+evalToplevel = evalBody
 
 evalBody :: [Datum] -> Haschoo ScmValue
 evalBody (UnevaledApp (UnevaledId "define":xs) : ds) =
