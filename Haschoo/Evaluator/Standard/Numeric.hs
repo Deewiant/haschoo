@@ -2,7 +2,8 @@
 
 {-# LANGUAGE Rank2Types #-}
 
-module Haschoo.Evaluator.Standard.Numeric (procedures) where
+module Haschoo.Evaluator.Standard.Numeric
+   (procedures, isNumeric, isExact, numEq) where
 
 import Control.Arrow ((&&&), (***))
 import Control.Monad (ap, foldM)
@@ -115,12 +116,15 @@ scmIsInteger []  = tooFewArgs  "integer?"
 scmIsInteger _   = tooManyArgs "integer?"
 
 scmIsExact :: String -> [ScmValue] -> ErrOr Bool
-scmIsExact _ [ScmInt _]        = Right True
-scmIsExact _ [ScmRat _]        = Right True
-scmIsExact _ [x] | isNumeric x = Right False
+scmIsExact _ [x] | isNumeric x = Right $ isExact x
 scmIsExact s [_]               = notNum s
 scmIsExact s []                = tooFewArgs s
 scmIsExact s _                 = tooManyArgs s
+
+isExact :: ScmValue -> Bool
+isExact (ScmInt _) = True
+isExact (ScmRat _) = True
+isExact _          = False
 
 ---- Comparison
 
