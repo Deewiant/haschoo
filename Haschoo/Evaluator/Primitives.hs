@@ -27,9 +27,9 @@ primitives = map (\(a,b) -> (a, ScmPrim a b)) $
 scmLambda :: [Datum] -> Haschoo ScmValue
 scmLambda []                          = tooFewArgs "lambda"
 scmLambda [_]                         = tooFewArgs "lambda"
-scmLambda (UnevaledApp params : body) = return $ ScmPrim name func
+scmLambda (UnevaledApp params : body) = fmap (ScmPrim name . func) get
  where
-   func xs = do
+   func ctx xs = do
       args <- mapM eval xs
       case compareLengths args params of
            EQ ->
@@ -37,7 +37,7 @@ scmLambda (UnevaledApp params : body) = return $ ScmPrim name func
                    Right ns -> do
                       let c = subContext ns args
                       case compareLength params (contextSize c) of
-                           EQ -> withHaschoo (c:) $ evalBody body
+                           EQ -> withHaschoo (const (c:ctx)) $ evalBody body
                            LT -> duplicateParam
                            GT -> error "lambda :: the impossible happened"
                    Left bad -> badParam bad
