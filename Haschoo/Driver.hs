@@ -2,7 +2,7 @@
 
 module Haschoo.Driver (main) where
 
-import Control.Monad      ((<=<))
+import Control.Monad      ((<=<), (>=>))
 import System.Environment (getArgs)
 import System.IO          ( Handle, stdin, stderr, openFile, IOMode(ReadMode)
                           , hGetContents, hPutStrLn)
@@ -20,12 +20,14 @@ main :: IO ()
 main = do
    args <- getArgs
    if null args
-      then run stdin
-      else mapM_ (run <=< flip openFile ReadMode) args
+      then runHandle stdin
+      else mapM_ (runHandle <=< flip openFile ReadMode) args
 
-run :: Handle -> IO ()
-run h = do
-   str <- hGetContents h
+runHandle :: Handle -> IO ()
+runHandle = hGetContents >=> run
+
+run :: String -> IO ()
+run str =
    case fst $ runParser program str of
         Left  e -> hPutStrLn stderr $ "Parse error: " ++ e
         Right p -> do
