@@ -7,12 +7,14 @@ import qualified Haschoo.Evaluator.Standard.Boolean     as Boolean
 import qualified Haschoo.Evaluator.Standard.Equivalence as Equivalence
 import qualified Haschoo.Evaluator.Standard.IO          as IO
 import qualified Haschoo.Evaluator.Standard.Numeric     as Numeric
+import qualified Haschoo.Evaluator.Standard.PairsLists  as PairsLists
 
 procedures :: [(String, ScmValue)]
 procedures = concat [ Boolean.procedures
                     , Equivalence.procedures
                     , IO.procedures
-                    , Numeric.procedures ]
+                    , Numeric.procedures
+                    , PairsLists.procedures ]
 
 context :: Context
 context = mkContext procedures

@@ -72,8 +72,13 @@ data ScmValue = ScmPrim    String !([Datum]    -> Haschoo   ScmValue)
               | ScmRat     !Rational
               | ScmReal    !Double
               | ScmComplex !(Complex Double)
-              | ScmList    ![ScmValue]
               | ScmQuoted  Datum
+
+              -- All lists created by the Scheme program
+              | ScmPair    !ScmValue !ScmValue
+
+              -- Constant lists
+              | ScmList    ![ScmValue]
 
               -- The "unspecified value" returned by IO procedures and such
               | ScmVoid
@@ -144,6 +149,18 @@ scmShow (ScmQuoted d) = let (q,y) = eatQuotes 1 d
  where
    eatQuotes !n (Evaluated (ScmQuoted x)) = eatQuotes (n+1) x
    eatQuotes !n x                         = (n,x)
+
+scmShow (ScmPair car cdr) = '(' : go car cdr
+ where
+   -- XXX: Our way of representing symbols seems to be painfully poor
+   go a (ScmQuoted (UnevaledApp []))  = scmShow a ++ ")"
+   go a (ScmQuoted (UnevaledApp xs))  = tail.scmShowDatum $
+                                           UnevaledApp (Evaluated a : xs)
+   go a (ScmQuoted (DottedList as b)) = tail.scmShowDatum $
+                                           DottedList (Evaluated a : as) b
+   go a (ScmPair x y)                 = scmShow a ++ " " ++ go x y
+   go a l@(ScmList _)                 = scmShow a ++ " " ++ tail (scmShow l)
+   go a b                             = scmShow a ++ " . " ++ scmShow b ++ ")"
 
 scmShowDatum :: Datum -> String
 scmShowDatum (Evaluated v)     = scmShow v
