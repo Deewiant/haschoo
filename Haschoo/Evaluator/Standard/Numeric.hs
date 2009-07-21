@@ -97,17 +97,21 @@ procedures = map (\(a,b) -> (a, ScmFunc a (return . b))) $
 
 scmIsNumber, scmIsReal, scmIsRational, scmIsInteger :: [ScmValue] -> ErrOr Bool
 scmIsNumber [x] = Right $ isNumeric x
+scmIsNumber []  = tooFewArgs  "number?"
 scmIsNumber _   = tooManyArgs "number?"
 
 scmIsReal [ScmComplex (_ :+ b)] = Right $ b == 0
 scmIsReal [x]                   = Right $ isNumeric x
+scmIsReal []                    = tooFewArgs  "real?"
 scmIsReal _                     = tooManyArgs "real?"
 
 scmIsRational [ScmRat _] = Right True
 scmIsRational [_]        = Right False
+scmIsRational []         = tooFewArgs "rational?"
 scmIsRational _          = tooManyArgs "rational?"
 
 scmIsInteger [x] = Right $ isInteger x
+scmIsInteger []  = tooFewArgs  "integer?"
 scmIsInteger _   = tooManyArgs "integer?"
 
 scmIsExact :: String -> [ScmValue] -> ErrOr Bool
@@ -115,6 +119,7 @@ scmIsExact _ [ScmInt _]        = Right True
 scmIsExact _ [ScmRat _]        = Right True
 scmIsExact _ [x] | isNumeric x = Right False
 scmIsExact s [_]               = notNum s
+scmIsExact s []                = tooFewArgs s
 scmIsExact s _                 = tooManyArgs s
 
 ---- Comparison
