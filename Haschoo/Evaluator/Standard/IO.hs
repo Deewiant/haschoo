@@ -10,6 +10,7 @@ procedures :: [(String, ScmValue)]
 procedures = map (\(a,b) -> (a, ScmFunc a b)) $
    [ ("write",   scmWrite)
    , ("display", scmDisplay)
+   , ("newline", scmNewline)
    ]
 
 scmWrite, scmDisplay :: [ScmValue] -> IO (ErrOr ScmValue)
@@ -27,3 +28,7 @@ scmPrint f _ [x]   = putStr (f x) >> return (Right ScmVoid)
 scmPrint _ s [_,_] = return.Left $ s ++ " :: output to port not implemented"
 scmPrint _ s []    = return $ tooFewArgs  s
 scmPrint _ s _     = return $ tooManyArgs s
+
+scmNewline :: [ScmValue] -> IO (ErrOr ScmValue)
+scmNewline [] = putStrLn "" >> return (Right ScmVoid)
+scmNewline _  = return $ tooManyArgs "newline"
