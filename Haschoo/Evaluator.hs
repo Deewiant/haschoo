@@ -6,13 +6,14 @@ import           Control.Monad       (msum)
 import           Control.Monad.Error (throwError)
 import           Control.Monad.State (get, modify)
 import           Control.Monad.Trans (liftIO)
+import           Data.IORef          (readIORef, modifyIORef)
 import qualified Data.IntMap as IM
 import qualified Data.ListTrie.Patricia.Map.Enum as TM
 
 import Haschoo.Types           ( Haschoo, Datum(..)
                                , ScmValue(ScmPrim, ScmFunc, ScmVoid)
                                , idMap, valMap, addToContext, contextLookup)
-import Haschoo.Utils           (ErrOr)
+import Haschoo.Utils           (ErrOr, lazyMapM, modifyM)
 import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
 
 -- Programs consist of three things:
@@ -42,7 +43,8 @@ eval :: Datum -> Haschoo ScmValue
 eval (Evaluated  v) = return v
 eval (UnevaledId s) = do
    ctx <- get
-   case msum $ map (contextLookup s) ctx of
+   lookups <- lazyMapM (fmap (contextLookup s) . readIORef) ctx
+   case msum lookups of
         Nothing    -> fail $ "Unbound identifier '" ++ s ++ "'"
         Just (c,i) -> case IM.lookup i (valMap c) of
                            Just v  -> return v
@@ -88,7 +90,9 @@ scmDefinition (_:_:_) = throwError "define :: expected identifier"
 scmDefinition _       = tooFewArgs "define"
 
 define :: String -> Datum -> Haschoo ()
-define var body = eval body >>= modify . f
+define var body = eval body >>= modifyM . f
  where
-   f e (c:cs) = addToContext var e c : cs
+   f e (c:cs) = do
+      liftIO $ modifyIORef c (addToContext var e)
+      return (c:cs)
    f _ []     = error "define :: the impossible happened: empty context stack"

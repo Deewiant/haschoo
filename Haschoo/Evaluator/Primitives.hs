@@ -4,6 +4,8 @@ module Haschoo.Evaluator.Primitives (context) where
 
 import Control.Monad.Error (throwError)
 import Control.Monad.State (get, put)
+import Control.Monad.Trans (liftIO)
+import Data.IORef          (IORef, newIORef, readIORef, modifyIORef)
 
 import Haschoo.Types           ( Haschoo, withHaschoo
                                , Datum(..), ScmValue(..), isTrue
@@ -27,12 +29,7 @@ primitives = map (\(a,b) -> (a, ScmPrim a b)) $
 scmLambda :: [Datum] -> Haschoo ScmValue
 scmLambda []                          = tooFewArgs "lambda"
 scmLambda [_]                         = tooFewArgs "lambda"
-scmLambda (UnevaledApp params : body) =
-   -- FIXME: copying the definition context like this means that forward
-   -- references don't work, e.g. this should give 1:
-   --
-   -- (define (f) (g)) (define (g) 1) (f)
-   fmap (ScmPrim name . func) get
+scmLambda (UnevaledApp params : body) = fmap (ScmPrim name . func) get
  where
    func ctx xs = do
       args <- mapM eval xs
@@ -42,7 +39,9 @@ scmLambda (UnevaledApp params : body) =
                    Right ns -> do
                       let c = subContext ns args
                       case compareLength params (contextSize c) of
-                           EQ -> withHaschoo (const (c:ctx)) $ evalBody body
+                           EQ -> do
+                              c' <- liftIO $ newIORef c
+                              withHaschoo (const (c':ctx)) $ evalBody body
                            LT -> duplicateParam
                            GT -> error "lambda :: the impossible happened"
                    Left bad -> badParam bad
@@ -54,16 +53,8 @@ scmLambda (UnevaledApp params : body) =
       f (UnevaledId x) = Right x
       f x              = Left (scmShowDatum x)
 
-   -- FIXME: these should be cached somewhere somehow, not fully recreated every
+   -- TODO: these should be cached somewhere somehow, not fully recreated every
    -- time: we just need to substitute the parameter values
-   --
-   -- It's a FIXME because recreating the context every call means that we
-   -- don't remember old values, e.g. this should give 1 and 2, not 1 and 1:
-   --
-   -- (define (f) (define n 0) (lambda () (set! n (+ n 1)) n))
-   -- (define x (f))
-   -- (x)
-   -- (x)
    name = "<lambda>"
    subContext = mkContext .: zip
 
@@ -94,8 +85,14 @@ scmSet [UnevaledId var, expr] = do
    put ctx'
    return ScmVoid
  where
-   f e (c:cs) = case contextLookup var c of
-                     Just _  -> return $ addToContext var e c : cs
-                     Nothing -> fmap (c:) (f e cs)
+   f :: ScmValue -> [IORef Context] -> Haschoo [IORef Context]
+   f e (c:cs) = do
+      c' <- liftIO $ readIORef c
+      case contextLookup var c' of
+           Just _  -> do
+              liftIO $ modifyIORef c (addToContext var e)
+              return (c:cs)
 
-   f e []     = throwError $ "Unbound identifier '" ++ var ++ "'"
+           Nothing -> fmap (c:) (f e cs)
+
+   f e [] = throwError $ "Unbound identifier '" ++ var ++ "'"

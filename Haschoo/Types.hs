@@ -23,6 +23,7 @@ import Control.Monad.State.Strict      ( StateT, MonadState, runStateT
                                        , evalStateT, get)
 import Control.Monad.Trans             (MonadIO, liftIO)
 import Data.Complex                    (Complex((:+)))
+import Data.IORef                      (IORef)
 import Data.IntMap                     (IntMap)
 import Data.ListTrie.Patricia.Map.Enum (TrieMap)
 import Data.Maybe                      (fromMaybe)
@@ -35,18 +36,20 @@ import qualified Data.ListTrie.Patricia.Map.Enum as TM
 import Haschoo.Utils (ErrOr, swap, showScmList)
 
 -- Our main monad
-newtype Haschoo a = Haschoo (StateT [Context] (ErrorT String IO) a)
-   deriving (Functor, Monad, MonadIO, MonadState [Context], MonadError String)
+newtype Haschoo a = Haschoo (StateT HaschState (ErrorT String IO) a)
+   deriving (Functor, Monad, MonadIO, MonadState HaschState, MonadError String)
 
-runHaschoo :: [Context] -> Haschoo a -> IO (ErrOr a)
-runHaschoo ctx (Haschoo h) = runErrorT $ evalStateT h ctx
+runHaschoo :: HaschState -> Haschoo a -> IO (ErrOr a)
+runHaschoo state (Haschoo h) = runErrorT $ evalStateT h state
+
+type HaschState = [IORef Context]
 
 -- Like 'local' in MonadReader. (Not like withStateT in MonadState, which
 -- evidently does something different.)
-withHaschoo :: ([Context] -> [Context]) -> Haschoo a -> Haschoo a
+withHaschoo :: (HaschState -> HaschState) -> Haschoo a -> Haschoo a
 withHaschoo f h = do
-   ctx <- get
-   x <- liftIO $ runHaschoo (f ctx) h
+   state <- get
+   x <- liftIO $ runHaschoo (f state) h
    case x of
         Left  s -> throwError s
         Right a -> return a

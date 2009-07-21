@@ -3,6 +3,7 @@
 module Haschoo.Driver (main) where
 
 import Control.Monad      ((<=<), (>=>))
+import Data.IORef         (newIORef)
 import System.Environment (getArgs)
 import System.IO          ( Handle, stdin, stderr, openFile, IOMode(ReadMode)
                           , hGetContents, hPutStrLn)
@@ -31,7 +32,8 @@ run str =
    case fst $ runParser program str of
         Left  e -> hPutStrLn stderr $ "Parse error: " ++ e
         Right p -> do
-           result <- runHaschoo toplevelContext (evalToplevel p)
+           ctx    <- mapM newIORef toplevelContext
+           result <- runHaschoo ctx (evalToplevel p)
            case result of
                 Left  e -> hPutStrLn stderr $ "Runtime error: " ++ e
                 Right _ -> return ()

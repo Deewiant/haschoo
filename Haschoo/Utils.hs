@@ -4,7 +4,10 @@ module Haschoo.Utils where
 
 import Control.Monad       (liftM)
 import Control.Monad.Error () -- Monad ErrOr
+import Control.Monad.State (MonadState, get, put)
+import Control.Monad.Trans (MonadIO, liftIO)
 import Data.List           (intercalate)
+import System.IO.Unsafe    (unsafeInterleaveIO)
 
 type ErrOr = Either String
 
@@ -32,6 +35,12 @@ void = fmap (const ())
 
 allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
 allM f = liftM and . mapM f
+
+lazyMapM :: MonadIO io => (a -> IO b) -> [a] -> io [b]
+lazyMapM f = mapM (liftIO . unsafeInterleaveIO . f)
+
+modifyM :: (MonadState s m) => (s -> m s) -> m ()
+modifyM = (put =<<) . (get >>=)
 
 infixl 0 $<
 ($<) :: a -> (a -> b) -> b
