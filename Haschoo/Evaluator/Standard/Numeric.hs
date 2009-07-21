@@ -137,8 +137,8 @@ scmNumEq xs = allM f . (zip`ap`tail) $ xs
                 else notNum "="
 
 numEq :: ScmValue -> ScmValue -> Bool
-numEq a b =
-   case pairScmComplex a b of
+numEq x y =
+   case pairScmComplex x y of
         Right (ScmInt     a, ScmInt     b) -> a == b
         Right (ScmRat     a, ScmRat     b) -> a == b
         Right (ScmReal    a, ScmReal    b) -> a == b

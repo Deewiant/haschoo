@@ -19,8 +19,7 @@ module Haschoo.Types
 import Control.Monad                   (liftM2)
 import Control.Monad.Error             ( ErrorT, MonadError, runErrorT
                                        , throwError)
-import Control.Monad.State.Strict      ( StateT, MonadState, runStateT
-                                       , evalStateT, get)
+import Control.Monad.State.Strict      (StateT, MonadState, evalStateT, get)
 import Control.Monad.Trans             (MonadIO, liftIO)
 import Data.Complex                    (Complex((:+)))
 import Data.IORef                      (IORef)
@@ -140,7 +139,7 @@ scmShow (ScmString s) = '"' : foldr ((.) . f) id s "\""
        | c == '\"' = showString "\\\""
        | otherwise = showChar c
 
-scmShow (ScmQuoted x) = let (q,y) = eatQuotes 1 x
+scmShow (ScmQuoted d) = let (q,y) = eatQuotes 1 d
                          in replicate (q-1) '\'' ++ scmShowDatum y
  where
    eatQuotes !n (Evaluated (ScmQuoted x)) = eatQuotes (n+1) x

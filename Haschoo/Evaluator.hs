@@ -4,17 +4,16 @@ module Haschoo.Evaluator (evalToplevel, evalBody, eval) where
 
 import           Control.Monad       (msum)
 import           Control.Monad.Error (throwError)
-import           Control.Monad.State (get, modify)
+import           Control.Monad.State (get)
 import           Control.Monad.Trans (liftIO)
 import           Data.IORef          (readIORef, modifyIORef)
 import qualified Data.IntMap as IM
-import qualified Data.ListTrie.Patricia.Map.Enum as TM
 
 import Haschoo.Types           ( Haschoo, Datum(..)
                                , ScmValue(ScmPrim, ScmFunc, ScmVoid)
-                               , idMap, valMap, addToContext, contextLookup)
-import Haschoo.Utils           (ErrOr, lazyMapM, modifyM)
-import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
+                               , valMap, addToContext, contextLookup)
+import Haschoo.Utils           (lazyMapM, modifyM)
+import Haschoo.Evaluator.Utils (tooFewArgs)
 
 -- Programs consist of three things:
 --    expressions        - valid anywhere

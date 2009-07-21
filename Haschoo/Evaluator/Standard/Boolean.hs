@@ -3,7 +3,7 @@
 module Haschoo.Evaluator.Standard.Boolean (procedures) where
 
 import Haschoo.Types           (ScmValue(..))
-import Haschoo.Utils           (ErrOr, (.:))
+import Haschoo.Utils           (ErrOr)
 import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
 
 procedures :: [(String, ScmValue)]

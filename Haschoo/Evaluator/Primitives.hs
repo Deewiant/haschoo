@@ -13,7 +13,7 @@ import Haschoo.Types           ( Haschoo, withHaschoo
                                , Context, mkContext, contextSize
                                , addToContext, contextLookup
                                , scmShowDatum)
-import Haschoo.Utils           (ErrOr, compareLength, compareLengths, (.:))
+import Haschoo.Utils           (compareLength, compareLengths, (.:))
 import Haschoo.Evaluator       (eval, evalBody)
 import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
 
@@ -113,4 +113,8 @@ scmSet [UnevaledId var, expr] = do
 
            Nothing -> fmap (c:) (f e cs)
 
-   f e [] = throwError $ "Unbound identifier '" ++ var ++ "'"
+   f _ [] = throwError $ "Unbound identifier '" ++ var ++ "'"
+
+scmSet [_,_]   = throwError $ "Non-identifier argument to set!"
+scmSet (_:_:_) = tooManyArgs "set!"
+scmSet _       = tooFewArgs  "set!"

@@ -34,7 +34,7 @@ scmEq a b = if isNumeric a && isNumeric b
                then ptrEq  a b
                else scmEqv a b
 
-scmEqual (ScmList a) (ScmList b) = go a b
+scmEqual (ScmList x) (ScmList y) = go x y
  where
    go []     []     = return True
    go []     _      = return False
