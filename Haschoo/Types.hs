@@ -16,15 +16,18 @@ module Haschoo.Types
    , scmShow, scmShowDatum
    ) where
 
-import Control.Monad              (liftM2)
-import Control.Monad.Error        (ErrorT, MonadError, runErrorT, throwError)
-import Control.Monad.State.Strict (StateT, MonadState, runStateT, evalStateT, get)
-import Control.Monad.Trans        (MonadIO, liftIO)
-import Data.Complex               (Complex((:+)))
-import Data.IntMap                (IntMap)
+import Control.Monad                   (liftM2)
+import Control.Monad.Error             ( ErrorT, MonadError, runErrorT
+                                       , throwError)
+import Control.Monad.State.Strict      ( StateT, MonadState, runStateT
+                                       , evalStateT, get)
+import Control.Monad.Trans             (MonadIO, liftIO)
+import Data.Complex                    (Complex((:+)))
+import Data.IntMap                     (IntMap)
 import Data.ListTrie.Patricia.Map.Enum (TrieMap)
-import Data.Ratio          (numerator, denominator)
-import Text.Show.Functions ()
+import Data.Maybe                      (fromMaybe)
+import Data.Ratio                      (numerator, denominator)
+import Text.Show.Functions             ()
 
 import qualified Data.IntMap as IM
 import qualified Data.ListTrie.Patricia.Map.Enum as TM
@@ -91,12 +94,9 @@ mkContext namedVals = Context ids vals
 
 addToContext :: String -> ScmValue -> Context -> Context
 addToContext name val (Context ids vals) =
-   let newId = fmap ((+1) . fst . fst) (IM.maxViewWithKey vals)
-    in case newId of
-            Just n  -> Context (TM.insert' name n ids)
-                               (IM.insert  n val vals)
-            Nothing ->
-               error "addToContext :: the impossible happened: empty context"
+   let newId = fromMaybe 0 $ fmap ((+1) . fst . fst) (IM.maxViewWithKey vals)
+    in Context (TM.insert' name newId ids)
+               (IM.insert  newId val vals)
 
 contextLookup :: String -> Context -> Maybe (Context, Int)
 contextLookup s = liftM2 fmap (,) (TM.lookup s . idMap)
