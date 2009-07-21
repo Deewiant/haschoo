@@ -14,11 +14,14 @@ type ErrOr = Either String
 swap :: (a,b) -> (b,a)
 swap ~(a,b) = (b,a)
 
-compareLengths :: [a] -> [b] -> Ordering
-compareLengths []     []     = EQ
-compareLengths (_:_)  []     = GT
-compareLengths []     (_:_)  = LT
-compareLengths (_:as) (_:bs) = compareLengths as bs
+-- Returns the length of the shorter of the two
+compareLengths :: [a] -> [b] -> (Ordering, Int)
+compareLengths = go 0
+ where
+   go n []     []     = (EQ, n)
+   go n (_:_)  []     = (GT, n)
+   go n []     (_:_)  = (LT, n)
+   go n (_:as) (_:bs) = go (n+1) as bs
 
 compareLength :: [a] -> Int -> Ordering
 compareLength _      n | n < 0 = GT

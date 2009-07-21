@@ -2,6 +2,7 @@
 
 module Haschoo.Evaluator.Primitives (context) where
 
+import Control.Applicative ((<$>))
 import Control.Monad.Error (throwError)
 import Control.Monad.State (get, put)
 import Control.Monad.Trans (liftIO)
@@ -27,31 +28,50 @@ primitives = map (\(a,b) -> (a, ScmPrim a b)) $
    , ("set!",   scmSet) ]
 
 scmLambda :: [Datum] -> Haschoo ScmValue
-scmLambda []                          = tooFewArgs "lambda"
-scmLambda [_]                         = tooFewArgs "lambda"
-scmLambda (UnevaledApp params : body) = fmap (ScmPrim name . func) get
- where
-   func ctx xs = do
-      args <- mapM eval xs
-      case compareLengths args params of
-           EQ ->
-              case paramNames of
-                   Right ns -> do
-                      let c = subContext ns args
-                      case compareLength params (contextSize c) of
-                           EQ -> do
-                              c' <- liftIO $ newIORef c
-                              withHaschoo (const (c':ctx)) $ evalBody body
-                           LT -> duplicateParam
-                           GT -> error "lambda :: the impossible happened"
-                   Left bad -> badParam bad
-           LT -> tooFewArgs  name
-           GT -> tooManyArgs name
+scmLambda []                                     = tooFewArgs "lambda"
+scmLambda [_]                                    = tooFewArgs "lambda"
+scmLambda (UnevaledApp ps                : body) = mkΛ ps  Nothing body <$> get
+scmLambda (                UnevaledId t  : body) = mkΛ [] (Just t) body <$> get
+scmLambda (DottedList  ps (UnevaledId t) : body) = mkΛ ps (Just t) body <$> get
 
-   paramNames = mapM f params
+scmLambda _ = throwError "Invalid parameters to lambda"
+
+mkΛ :: [Datum] -> Maybe String -> [Datum] -> [IORef Context] -> ScmValue
+mkΛ formals tailParams body ctx = ScmPrim name func
+ where
+   func = \xs -> do
+      case compareLengths xs formals of
+           (LT,_)      -> tooFewArgs name
+           (order,len) -> do
+              args <- mapM eval xs
+              case tailParams of
+                   Nothing ->
+                      if order == EQ
+                         then make id args
+                         else tooManyArgs name
+                   Just n ->
+                      let (normal, tailArgs) = splitAt len args
+                       in make (++[n]) (normal ++ [ScmList tailArgs])
     where
-      f (UnevaledId x) = Right x
-      f x              = Left (scmShowDatum x)
+      make mkParams args =
+         case paramNames of
+              Right ns ->
+                 let ns' = mkParams ns
+                     c   = subContext ns' args
+                  in case compareLength ns' (contextSize c) of
+                          EQ -> do
+                             c' <- liftIO $ newIORef c
+                             withHaschoo (const (c':ctx)) $ evalBody body
+
+                          LT -> duplicateParam
+                          GT -> error "lambda :: the impossible happened"
+
+              Left bad -> badParam bad
+
+      paramNames = mapM f formals
+       where
+         f (UnevaledId x) = Right x
+         f x              = Left (scmShowDatum x)
 
    -- TODO: these should be cached somewhere somehow, not fully recreated every
    -- time: we just need to substitute the parameter values
@@ -63,8 +83,6 @@ scmLambda (UnevaledApp params : body) = fmap (ScmPrim name . func) get
    badParam bad   =
       throwError.concat $ ["Invalid parameter '", bad, "' to ", name]
 
--- FIXME: (lambda x x) is valid, as is dotted-tail notation
-scmLambda _ = throwError "Invalid parameters to lambda"
 
 scmQuote :: [Datum] -> Haschoo ScmValue
 scmQuote [x] = return $ ScmQuoted x
