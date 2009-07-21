@@ -27,7 +27,12 @@ primitives = map (\(a,b) -> (a, ScmPrim a b)) $
 scmLambda :: [Datum] -> Haschoo ScmValue
 scmLambda []                          = tooFewArgs "lambda"
 scmLambda [_]                         = tooFewArgs "lambda"
-scmLambda (UnevaledApp params : body) = fmap (ScmPrim name . func) get
+scmLambda (UnevaledApp params : body) =
+   -- FIXME: copying the definition context like this means that forward
+   -- references don't work, e.g. this should give 1:
+   --
+   -- (define (f) (g)) (define (g) 1) (f)
+   fmap (ScmPrim name . func) get
  where
    func ctx xs = do
       args <- mapM eval xs
@@ -49,8 +54,16 @@ scmLambda (UnevaledApp params : body) = fmap (ScmPrim name . func) get
       f (UnevaledId x) = Right x
       f x              = Left (scmShowDatum x)
 
-   -- TODO: these should be cached somewhere somehow, not fully recreated every
+   -- FIXME: these should be cached somewhere somehow, not fully recreated every
    -- time: we just need to substitute the parameter values
+   --
+   -- It's a FIXME because recreating the context every call means that we
+   -- don't remember old values, e.g. this should give 1 and 2, not 1 and 1:
+   --
+   -- (define (f) (define n 0) (lambda () (set! n (+ n 1)) n))
+   -- (define x (f))
+   -- (x)
+   -- (x)
    name = "<lambda>"
    subContext = mkContext .: zip
 
