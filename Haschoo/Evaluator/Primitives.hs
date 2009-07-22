@@ -9,7 +9,7 @@ import Control.Monad.Trans (liftIO)
 import Data.IORef          (IORef, newIORef, readIORef, modifyIORef)
 
 import Haschoo.Types           ( Haschoo, withHaschoo
-                               , ScmValue(..), scmShow, isTrue
+                               , ScmValue(..), isTrue
                                , Context, mkContext, contextSize
                                , addToContext, contextLookup)
 import Haschoo.Utils           (compareLength, compareLengths, (.:))

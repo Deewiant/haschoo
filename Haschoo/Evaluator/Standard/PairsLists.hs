@@ -90,6 +90,7 @@ carCdrCompositions = map (name &&& join func)
    func _ []       = return . Right . head
    func s ('a':xs) = func s xs >=> next s scmCar
    func s ('d':xs) = func s xs >=> next s scmCdr
+   func s _        = error (name s ++ " :: the impossible happened!")
 
    next _ _ x@(Left _) = return x
    next s f  (Right v) = f (name s) [v]
@@ -106,7 +107,7 @@ scmIsList :: [ScmValue] -> IO (ErrOr Bool)
 scmIsList [ScmList _]   = return$ Right True
 scmIsList [ScmPair _ b] = Right <$> (readIORef b >>= join go)
  where
-   go slow@(ScmPair _ sn) fast@(ScmPair _ fn) = do
+   go (ScmPair _ sn) fast@(ScmPair _ fn) = do
       fn' <- readIORef fn
       case fn' of
            ScmPair _ fn2 -> do
@@ -138,7 +139,7 @@ scmList (x:xs) = do
    return (ScmPair y z)
 
 scmLength :: [ScmValue] -> IO (ErrOr ScmValue)
-scmLength [ScmPair _ b] = readIORef b >>= go 1
+scmLength [ScmPair _ p] = readIORef p >>= go 1
  where
    go n _ | n `seq` False = undefined
    go n (ScmList [])  = return . Right . ScmInt . toInteger $ (n :: Int)

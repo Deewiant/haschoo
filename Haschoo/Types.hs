@@ -18,7 +18,7 @@ import Control.Applicative             ((<$>))
 import Control.Monad                   (liftM2, (<=<))
 import Control.Monad.Error             ( ErrorT, MonadError, runErrorT
                                        , throwError)
-import Control.Monad.State.Strict      (StateT, MonadState, evalStateT, get)
+import Control.Monad.State.Strict      (StateT, MonadState, evalStateT)
 import Control.Monad.Trans             (MonadIO, liftIO)
 import Data.Complex                    (Complex((:+)))
 import Data.IORef                      (IORef, readIORef)
