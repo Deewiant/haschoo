@@ -22,11 +22,12 @@ procedures = map (\(a,b) -> (a, ScmFunc a b)) $
 
    ++ carCdrCompositions ++
 
-   [ ("null?",  return . fmap ScmBool . scmIsNull)
-   , ("list?",  fmap (fmap ScmBool) . scmIsList)
-   , ("list",   fmap Right . scmList)
-   , ("length", scmLength)
-   , ("append", scmAppend) ]
+   [ ("null?",   return . fmap ScmBool . scmIsNull)
+   , ("list?",   fmap (fmap ScmBool) . scmIsList)
+   , ("list",    fmap Right . scmList)
+   , ("length",  scmLength)
+   , ("append",  scmAppend)
+   , ("reverse", scmReverse) ]
 
 ---- Pairs
 
@@ -183,6 +184,22 @@ scmAppend [ScmList xs, rhs] = do
 scmAppend [_,_]   = return$ notList     "append"
 scmAppend (_:_:_) = return$ tooManyArgs "append"
 scmAppend _       = return$ tooFewArgs  "append"
+
+scmReverse :: [ScmValue] -> IO (ErrOr ScmValue)
+scmReverse [ScmList xs]      = fmap (Right . fst) . pairify $ reverse xs
+scmReverse [x@(ScmPair _ _)] = go [] x
+ where
+   go rs (ScmList xs)  = fmap (Right . fst) . pairify $ reverse xs ++ rs
+   go rs (ScmPair a b) = do
+      a' <- readIORef a
+      b' <- readIORef b
+      go (a':rs) b'
+
+   go _ _ = return$ notList "reverse"
+
+scmReverse [_] = return$ notList     "reverse"
+scmReverse []  = return$ tooFewArgs  "reverse"
+scmReverse _   = return$ tooManyArgs "reverse"
 
 ---- Utils
 
