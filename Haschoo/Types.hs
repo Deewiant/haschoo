@@ -137,6 +137,7 @@ scmShow (ScmPair car cdr) = do
    as <- scmShow a
    ('(':) . (as ++) <$> (unsafeInterleaveIO $ readIORef cdr >>= go)
  where
+   go   (ScmList [])        = return ")"
    go x@(ScmList _)         = (' ':) . tail <$> scmShow x
    go x@(ScmDottedList _ _) = (' ':) . tail <$> scmShow x
 
