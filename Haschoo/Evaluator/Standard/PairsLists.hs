@@ -2,9 +2,10 @@
 
 module Haschoo.Evaluator.Standard.PairsLists (procedures) where
 
-import Control.Arrow ((&&&))
-import Control.Monad (join, replicateM, (>=>))
-import Data.IORef    (newIORef, readIORef, writeIORef)
+import Control.Applicative ((<$>))
+import Control.Arrow       ((&&&), second)
+import Control.Monad       (join, replicateM, (>=>))
+import Data.IORef          (IORef, newIORef, readIORef, writeIORef)
 
 import Haschoo.Types           (ScmValue(..))
 import Haschoo.Utils           (ErrOr, ($<), ptrEq)
@@ -24,7 +25,8 @@ procedures = map (\(a,b) -> (a, ScmFunc a b)) $
    [ ("null?",  return . fmap ScmBool . scmIsNull)
    , ("list?",  fmap (fmap ScmBool) . scmIsList)
    , ("list",   fmap Right . scmList)
-   , ("length", scmLength) ]
+   , ("length", scmLength)
+   , ("append", scmAppend) ]
 
 ---- Pairs
 
@@ -102,7 +104,7 @@ scmIsNull _            = tooManyArgs "null?"
 
 scmIsList :: [ScmValue] -> IO (ErrOr Bool)
 scmIsList [ScmList _]   = return$ Right True
-scmIsList [ScmPair _ b] = fmap Right $ readIORef b >>= join go
+scmIsList [ScmPair _ b] = Right <$> (readIORef b >>= join go)
  where
    go slow@(ScmPair _ sn) fast@(ScmPair _ fn) = do
       fn' <- readIORef fn
@@ -148,5 +150,57 @@ scmLength [_]           = return$ notList     "length"
 scmLength []            = return$ tooFewArgs  "length"
 scmLength _             = return$ tooManyArgs "length"
 
+scmAppend :: [ScmValue] -> IO (ErrOr ScmValue)
+scmAppend [p@(ScmPair _ _), rhs] = next p
+ where
+   -- Builds up the list as we iterate through it
+   next :: ScmValue -> IO (ErrOr ScmValue)
+   next (ScmPair a b) = do
+      b' <- go =<< readIORef b
+      case b' of
+           Left  _ -> return b'
+           Right y -> do
+              newA <- newIORef =<< readIORef a
+              newB <- newIORef y
+              return . Right $ ScmPair newA newB
+
+   next _ = error "append :: the impossible happened"
+
+   go :: ScmValue -> IO (ErrOr ScmValue)
+   go x@(ScmPair _ _) = next x
+   go x@(ScmList _)   = scmAppend [x, rhs]
+   go _               = return$ notList "append"
+
+scmAppend [ScmList xs, rhs] = do
+   (xs', fin) <- pairify xs
+   case fin of
+        Nothing -> return . Right $ rhs
+        Just p  -> do
+           writeIORef p rhs
+           return . Right $ xs'
+
+scmAppend [_,_]   = return$ notList     "append"
+scmAppend (_:_:_) = return$ tooManyArgs "append"
+scmAppend _       = return$ tooFewArgs  "append"
+
+---- Utils
+
 notList :: String -> ErrOr a
 notList = fail . ("Nonlist argument to "++)
+
+-- ScmList -> ScmPair, returns the tail pointer if it wasn't empty
+pairify :: [ScmValue] -> IO (ScmValue, Maybe (IORef ScmValue))
+pairify []     = return (ScmList [], Nothing)
+pairify (x:xs) = second Just <$> go x xs
+ where
+   go :: ScmValue -> [ScmValue] -> IO (ScmValue, IORef ScmValue)
+   go v [] = do
+      a <- newIORef v
+      b <- newIORef (ScmList [])
+      return (ScmPair a b, b)
+
+   go v (y:ys) = do
+      a         <- newIORef v
+      (zs, fin) <- go y ys
+      b         <- newIORef zs
+      return (ScmPair a b, fin)
