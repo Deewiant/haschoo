@@ -5,13 +5,15 @@ module Haschoo.Evaluator.Standard.PairsLists (procedures) where
 import Control.Applicative ((<$>))
 import Control.Arrow       ((&&&), second)
 import Control.Monad       (join, replicateM, (>=>))
+import Control.Monad.Loops (dropWhileM)
 import Data.IORef          (IORef, newIORef, readIORef, writeIORef)
 import Data.List           (genericDrop)
 
-import Haschoo.Types                      (ScmValue(..))
-import Haschoo.Utils                      (ErrOr, ($<), ptrEq)
-import Haschoo.Evaluator.Utils            (tooFewArgs, tooManyArgs)
-import Haschoo.Evaluator.Standard.Numeric (asInt)
+import Haschoo.Types                          (ScmValue(..))
+import Haschoo.Utils                          (ErrOr, ($<), ptrEq)
+import Haschoo.Evaluator.Utils                (tooFewArgs, tooManyArgs)
+import Haschoo.Evaluator.Standard.Equivalence (scmEq, scmEqv, scmEqual)
+import Haschoo.Evaluator.Standard.Numeric     (asInt)
 
 procedures :: [(String, ScmValue)]
 procedures = map (\(a,b) -> (a, ScmFunc a b)) $
@@ -30,7 +32,10 @@ procedures = map (\(a,b) -> (a, ScmFunc a b)) $
    , ("length",   scmLength)
    , ("append",   scmAppend)
    , ("reverse",  scmReverse)
-   , ("list-ref", scmListRef) ]
+   , ("list-ref", scmListRef)
+   , ("memq",     scmMemq)
+   , ("memv",     scmMemv)
+   , ("member",   scmMember) ]
 
 ---- Pairs
 
@@ -220,6 +225,38 @@ scmListRef [x, n] =
 
 scmListRef (_:_:_) = return$ tooManyArgs "list-ref"
 scmListRef _       = return$ tooFewArgs  "list-ref"
+
+--- memq memv member
+
+scmMemq, scmMemv, scmMember :: [ScmValue] -> IO (ErrOr ScmValue)
+scmMemq   = scmFind scmEq    "memq"
+scmMemv   = scmFind scmEqv   "memv"
+scmMember = scmFind scmEqual "member"
+
+scmFind :: (ScmValue -> ScmValue -> IO Bool) -> String
+        -> [ScmValue] -> IO (ErrOr ScmValue)
+scmFind p s [obj, list] =
+   case list of
+        ScmList _   -> go list
+        ScmPair _ _ -> go list
+        _           -> return$ notList s
+ where
+   go (ScmList xs) = do
+      ys <- dropWhileM (fmap not . p obj) xs
+      return.Right $ if null ys
+                        then ScmBool False
+                        else ScmList ys
+
+   go x@(ScmPair a b) = do
+      found <- p obj =<< readIORef a
+      if found
+         then return . Right $ x
+         else readIORef b >>= go
+
+   go _ = return$ notList s
+
+scmFind _ s (_:_:_) = return$ tooManyArgs s
+scmFind _ s _       = return$ tooFewArgs  s
 
 ---- Utils
 

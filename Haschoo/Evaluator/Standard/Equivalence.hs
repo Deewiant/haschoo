@@ -1,6 +1,7 @@
 -- File created: 2009-07-21 10:36:31
 
-module Haschoo.Evaluator.Standard.Equivalence (procedures) where
+module Haschoo.Evaluator.Standard.Equivalence
+   (procedures, scmEq, scmEqv, scmEqual) where
 
 import Control.Arrow ((&&&))
 
