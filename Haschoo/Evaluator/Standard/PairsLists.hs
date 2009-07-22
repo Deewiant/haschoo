@@ -2,20 +2,23 @@
 
 module Haschoo.Evaluator.Standard.PairsLists (procedures) where
 
-import Data.IORef          (newIORef, readIORef, writeIORef)
+import Control.Arrow ((&&&))
+import Control.Monad (join, replicateM, (>=>))
+import Data.IORef    (newIORef, readIORef, writeIORef)
 
 import Haschoo.Types           (ScmValue(..))
-import Haschoo.Utils           (ErrOr)
+import Haschoo.Utils           (ErrOr, ($<))
 import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
 
 procedures :: [(String, ScmValue)]
 procedures = map (\(a,b) -> (a, ScmFunc a b)) $
-   [ ("pair?",    return . fmap ScmBool . scmIsPair)
-   , ("cons",     scmCons)
-   , ("car",      scmCar)
-   , ("cdr",      scmCdr)
+   [ ("pair?", return . fmap ScmBool . scmIsPair)
+   , ("cons",  scmCons)
+   , "car" $< id &&& scmCar
+   , "cdr" $< id &&& scmCdr
    , ("set-car!", scmSetCar)
    , ("set-cdr!", scmSetCdr) ]
+   ++ carCdrCompositions
 
 scmIsPair :: [ScmValue] -> ErrOr Bool
 scmIsPair [ScmPair _ _] = Right True
@@ -32,31 +35,30 @@ scmCons [a, b]  = do
 scmCons (_:_:_) = return$ tooManyArgs "cons"
 scmCons _       = return$ tooFewArgs  "cons"
 
-scmCar, scmCdr :: [ScmValue] -> IO (ErrOr ScmValue)
-scmCar [ScmPair a _]           = return . Right =<< readIORef a
-scmCar [ScmList (a:_)]         = return . Right $ a
-scmCar [ScmDottedList (a:_) _] = return . Right $ a
-scmCar [ScmList []]            = fail "car :: empty list"
-scmCar [_]                     = notPair "car"
-scmCar []                      = return$ tooFewArgs  "car"
-scmCar _                       = return$ tooManyArgs "car"
+scmCar, scmCdr :: String -> [ScmValue] -> IO (ErrOr ScmValue)
+scmCar _ [ScmPair a _]           = return . Right =<< readIORef a
+scmCar _ [ScmList (a:_)]         = return . Right $ a
+scmCar _ [ScmDottedList (a:_) _] = return . Right $ a
+scmCar s [ScmList []]            = return . fail $ s ++ " :: empty list"
+scmCar s [_]                     = notPair s
+scmCar s []                      = return$ tooFewArgs  s
+scmCar s _                       = return$ tooManyArgs s
 
-scmCdr [ScmPair _ b]           = return . Right =<< readIORef b
-scmCdr [ScmList (_:bs)]        = return . Right $ ScmList bs
-scmCdr [ScmDottedList [_]   b] = return . Right $ b
-scmCdr [ScmDottedList (_:a) b] = return . Right $ ScmDottedList a b
-scmCdr [ScmList []]            = fail "cdr :: empty list"
-scmCdr [_]                     = notPair "cdr"
-scmCdr []                      = return$ tooFewArgs  "cdr"
-scmCdr _                       = return$ tooManyArgs "cdr"
+scmCdr _ [ScmPair _ b]           = return . Right =<< readIORef b
+scmCdr _ [ScmList (_:bs)]        = return . Right $ ScmList bs
+scmCdr _ [ScmDottedList [_]   b] = return . Right $ b
+scmCdr _ [ScmDottedList (_:a) b] = return . Right $ ScmDottedList a b
+scmCdr s [ScmList []]            = return . fail $ s ++ " :: empty list"
+scmCdr s [_]                     = notPair s
+scmCdr s []                      = return$ tooFewArgs  s
+scmCdr s _                       = return$ tooManyArgs s
 
-scmSetCar :: [ScmValue] -> IO (ErrOr ScmValue)
+scmSetCar, scmSetCdr :: [ScmValue] -> IO (ErrOr ScmValue)
 scmSetCar [ScmPair a _, v] = writeIORef a v >> return (Right ScmVoid)
 scmSetCar [_,_]            =         notPair     "set-car!"
 scmSetCar (_:_:_)          = return$ tooManyArgs "set-car!"
 scmSetCar _                = return$ tooFewArgs  "set-car!"
 
-scmSetCdr :: [ScmValue] -> IO (ErrOr ScmValue)
 scmSetCdr [ScmPair _ b, v] = writeIORef b v >> return (Right ScmVoid)
 scmSetCdr [_,_]            =         notPair     "set-cdr!"
 scmSetCdr (_:_:_)          = return$ tooManyArgs "set-cdr!"
@@ -64,3 +66,20 @@ scmSetCdr _                = return$ tooFewArgs  "set-cdr!"
 
 notPair :: String -> IO (ErrOr a)
 notPair = return . Left . ("Nonpair argument to " ++)
+
+carCdrCompositions :: [(String, [ScmValue] -> IO (ErrOr ScmValue))]
+carCdrCompositions = map (name &&& join func)
+                         (concatMap (flip replicateM "ad") [2..depth])
+ where
+   -- R5RS 6.3.2
+   depth = 4
+
+   name a = concat ["c",a,"r"]
+
+   func :: String -> String -> [ScmValue] -> IO (ErrOr ScmValue)
+   func _ []       = return . Right . head
+   func s ('a':xs) = func s xs >=> next s scmCar
+   func s ('d':xs) = func s xs >=> next s scmCdr
+
+   next _ _ x@(Left _) = return x
+   next s f  (Right v) = f (name s) [v]
