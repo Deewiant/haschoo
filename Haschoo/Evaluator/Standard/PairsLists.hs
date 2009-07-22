@@ -21,9 +21,10 @@ procedures = map (\(a,b) -> (a, ScmFunc a b)) $
 
    ++ carCdrCompositions ++
 
-   [ ("null?", return . fmap ScmBool . scmIsNull)
-   , ("list?", fmap (fmap ScmBool) . scmIsList)
-   , ("list",  fmap Right . scmList) ]
+   [ ("null?",  return . fmap ScmBool . scmIsNull)
+   , ("list?",  fmap (fmap ScmBool) . scmIsList)
+   , ("list",   fmap Right . scmList)
+   , ("length", scmLength) ]
 
 ---- Pairs
 
@@ -133,3 +134,19 @@ scmList (x:xs) = do
    y  <- newIORef x
    z  <- newIORef ys
    return (ScmPair y z)
+
+scmLength :: [ScmValue] -> IO (ErrOr ScmValue)
+scmLength [ScmPair _ b] = readIORef b >>= go 1
+ where
+   go n _ | n `seq` False = undefined
+   go n (ScmList [])  = return . Right . ScmInt . toInteger $ (n :: Int)
+   go n (ScmPair _ b) = readIORef b >>= go (n+1)
+   go _ _             = return$ notList "length"
+
+scmLength [ScmList xs]  = return . Right . ScmInt . toInteger $ length xs
+scmLength [_]           = return$ notList     "length"
+scmLength []            = return$ tooFewArgs  "length"
+scmLength _             = return$ tooManyArgs "length"
+
+notList :: String -> ErrOr a
+notList = fail . ("Nonlist argument to "++)
