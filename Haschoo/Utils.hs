@@ -3,6 +3,7 @@
 module Haschoo.Utils where
 
 import Control.Applicative   ((<$>))
+import Control.Arrow         (first)
 import Control.Monad         (liftM)
 import Control.Monad.Error   () -- Monad ErrOr
 import Control.Monad.State   (MonadState, get, put)
@@ -31,6 +32,11 @@ compareLength []     0         = EQ
 compareLength []     _         = LT
 compareLength (_:_)  0         = GT
 compareLength (_:as) n         = compareLength as (n-1)
+
+initLast :: [a] -> ([a], a)
+initLast [x]    = ([], x)
+initLast (x:xs) = first (x:) (initLast xs)
+initLast []     = error "initLast :: empty list"
 
 showScmList :: (a -> IO String) -> [a] -> IO String
 showScmList f xs =

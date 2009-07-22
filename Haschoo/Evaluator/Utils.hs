@@ -6,6 +6,8 @@ module Haschoo.Evaluator.Utils where
 
 import Control.Monad.Error (MonadError, throwError)
 
-tooFewArgs, tooManyArgs :: MonadError String m => String -> m a
+tooFewArgs, tooManyArgs, notList :: MonadError String m => String -> m a
 tooFewArgs  = throwError . ("Too few arguments to " ++)
 tooManyArgs = throwError . ("Too many arguments to " ++)
+
+notList = throwError . ("Nonlist argument to "++)

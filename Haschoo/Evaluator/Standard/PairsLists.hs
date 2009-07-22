@@ -13,7 +13,7 @@ import Data.Maybe          (fromMaybe)
 
 import Haschoo.Types                          (ScmValue(..), pairToList)
 import Haschoo.Utils                          (ErrOr, ($<), ptrEq)
-import Haschoo.Evaluator.Utils                (tooFewArgs, tooManyArgs)
+import Haschoo.Evaluator.Utils                (tooFewArgs,tooManyArgs, notList)
 import Haschoo.Evaluator.Standard.Equivalence (scmEq, scmEqv, scmEqual)
 import Haschoo.Evaluator.Standard.Numeric     (asInt)
 
@@ -325,10 +325,9 @@ scmLookup _ s _       = return$ tooFewArgs  s
 
 ---- Utils
 
-immutable, notPair, notList :: String -> ErrOr a
+immutable, notPair :: String -> ErrOr a
 immutable = fail . ("Immutable argument to " ++)
 notPair   = fail . ("Nonpair argument to " ++)
-notList   = fail . ("Nonlist argument to "++)
 
 -- ScmList -> ScmPair, returns the tail pointer if it wasn't empty
 pairify :: [ScmValue] -> IO (ScmValue, Maybe (IORef ScmValue))
