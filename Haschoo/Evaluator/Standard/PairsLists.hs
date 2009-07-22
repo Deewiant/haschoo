@@ -22,7 +22,8 @@ procedures = map (\(a,b) -> (a, ScmFunc a b)) $
    ++ carCdrCompositions ++
 
    [ ("null?", return . fmap ScmBool . scmIsNull)
-   , ("list?", fmap (fmap ScmBool) . scmIsList) ]
+   , ("list?", fmap (fmap ScmBool) . scmIsList)
+   , ("list",  fmap Right . scmList) ]
 
 ---- Pairs
 
@@ -124,3 +125,11 @@ scmIsList [ScmPair _ b] = fmap Right $ readIORef b >>= join go
 scmIsList [_]           = return$ Right False
 scmIsList []            = return$ tooFewArgs  "list?"
 scmIsList _             = return$ tooManyArgs "list?"
+
+scmList :: [ScmValue] -> IO ScmValue
+scmList []     = return (ScmList [])
+scmList (x:xs) = do
+   ys <- scmList xs
+   y  <- newIORef x
+   z  <- newIORef ys
+   return (ScmPair y z)
