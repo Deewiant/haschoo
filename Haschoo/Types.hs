@@ -9,7 +9,7 @@
 
 module Haschoo.Types
    ( Haschoo, runHaschoo, withHaschoo
-   , ScmValue(..), isTrue
+   , ScmValue(..), isTrue, pairToList
    , Context(..), mkContext, addToContext, contextLookup, contextSize
    , scmShow
    ) where
@@ -71,6 +71,22 @@ data ScmValue = ScmPrim       String !([ScmValue] -> Haschoo   ScmValue)
 isTrue :: ScmValue -> Bool
 isTrue (ScmBool False) = False
 isTrue _               = True
+
+-- From ScmPair to Left . ScmDottedList or Right . ScmList
+pairToList :: ScmValue -> IO (Either ScmValue ScmValue)
+pairToList = go []
+ where
+   go xs (ScmList       ys)   =
+      return . Right $ ScmList       (reverse xs ++ ys)
+   go xs (ScmDottedList ys z) =
+      return . Left  $ ScmDottedList (reverse xs ++ ys) z
+
+   go xs (ScmPair a b) = do
+      a' <- readIORef a
+      b' <- readIORef b
+      go (a':xs) b'
+
+   go xs v = return . Left $ ScmDottedList (reverse xs) v
 
 data Context = Context { idMap  :: TrieMap Char Int
                        , valMap :: IntMap ScmValue }

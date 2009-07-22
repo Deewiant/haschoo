@@ -5,7 +5,7 @@ module Haschoo.Evaluator.Standard.Equivalence
 
 import Control.Arrow ((&&&))
 
-import Haschoo.Types                      (ScmValue(..))
+import Haschoo.Types                      (ScmValue(..), pairToList)
 import Haschoo.Utils                      (ErrOr, ($<), (.:), ptrEq)
 import Haschoo.Evaluator.Utils            (tooFewArgs, tooManyArgs)
 import Haschoo.Evaluator.Standard.Numeric (isExact, isNumeric, numEq)
@@ -41,7 +41,22 @@ scmEqual (ScmList x) (ScmList y) = go x y
    go []     _      = return False
    go _      []     = return False
    go (a:as) (b:bs) =
-      scmEqv a b >>= \e -> if not e then return False else go as bs
+      scmEqual a b >>= \e -> if e then go as bs else return False
+
+scmEqual (ScmDottedList x a) (ScmDottedList y b) = do
+   ab <- scmEqual a b
+   if ab
+      then scmEqual (ScmList x) (ScmList y)
+      else return False
+
+scmEqual x@(ScmList _) y@(ScmPair _ _) =
+   either (const $ return False) (scmEqual x) =<< pairToList y
+
+scmEqual x@(ScmDottedList _ _) y@(ScmPair _ _) =
+   either (scmEqual x) (const $ return False) =<< pairToList y
+
+scmEqual y@(ScmPair _ _) x@(ScmList       _)   = scmEqual x y
+scmEqual y@(ScmPair _ _) x@(ScmDottedList _ _) = scmEqual x y
 
 scmEqual (ScmString a) (ScmString b) = return$ a == b
 scmEqual a b = scmEqv a b
