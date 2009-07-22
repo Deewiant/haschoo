@@ -60,7 +60,7 @@ mkΛ formals tailParams body = ScmPrim name . func <$> get
                   in case compareLength ns' (contextSize c) of
                           EQ -> do
                              c' <- liftIO $ newIORef c
-                             withHaschoo (const (c':ctx)) $ evalBody body
+                             withHaschoo (c':ctx) $ evalBody body
 
                           LT -> duplicateParam
                           GT -> error "lambda :: the impossible happened"

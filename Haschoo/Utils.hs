@@ -51,6 +51,6 @@ infixl 0 $<
 ($<) :: a -> (a -> b) -> b
 ($<) = flip ($)
 
-infixl 8 .:
+infixr 9 .:
 (.:) :: (d -> c) -> (a -> b -> d) -> a -> b -> c
 f .: g = \x y -> f (g x y)
