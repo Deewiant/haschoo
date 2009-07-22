@@ -45,27 +45,25 @@ eval (ScmIdentifier s) = do
    ctx <- get
    lookups <- lazyMapM (fmap (contextLookup s) . readIORef) ctx
    case msum lookups of
-        Nothing    -> fail $ "Unbound identifier '" ++ s ++ "'"
+        Nothing    -> throwError $ "Unbound identifier '" ++ s ++ "'"
         Just (c,i) -> case IM.lookup i (valMap c) of
                            Just v  -> return v
                            Nothing ->
                               throwError $ "Internal error looking up " ++ s
 
-eval (ScmList xs) =
-   case xs of
-        []   -> fail "Empty application"
-        y:ys -> do
-           evaledHead <- eval y
-           case evaledHead of
-                ScmPrim _ f -> f ys
-                ScmFunc _ f -> do
-                   args   <- mapM eval ys
-                   result <- liftIO $ f args
-                   case result of
-                        Left  s   -> throwError s
-                        Right val -> return val
+eval (ScmList [])     = throwError "Empty application"
+eval (ScmList (x:xs)) = do
+   evaledHead <- eval x
+   case evaledHead of
+        ScmPrim _ f -> f xs
+        ScmFunc _ f -> do
+           args   <- mapM eval xs
+           result <- liftIO $ f args
+           case result of
+                Left  s   -> throwError s
+                Right val -> return val
 
-                _           -> throwError "Can't apply non-function"
+        _ -> throwError "Can't apply non-function"
 
 eval (ScmDottedList _ _) = throwError "Ill-formed application: no dots allowed"
 eval v                   = return v
