@@ -44,11 +44,12 @@ procedures = map (\(a,b) -> (a, ScmFunc a b)) $
 ---- Pairs
 
 scmIsPair :: [ScmValue] -> ErrOr Bool
-scmIsPair [ScmPair _ _] = Right True
-scmIsPair [ScmList _]   = Right True
-scmIsPair [_]           = Right False
-scmIsPair []            = tooFewArgs  "pair?"
-scmIsPair _             = tooManyArgs "pair?"
+scmIsPair [ScmPair _ _]       = Right True
+scmIsPair [ScmList _]         = Right True
+scmIsPair [ScmDottedList _ _] = Right True
+scmIsPair [_]                 = Right False
+scmIsPair []                  = tooFewArgs  "pair?"
+scmIsPair _                   = tooManyArgs "pair?"
 
 scmCons :: [ScmValue] -> IO (ErrOr ScmValue)
 scmCons [a, b]  = do
