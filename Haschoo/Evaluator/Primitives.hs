@@ -8,7 +8,7 @@ import Control.Monad.State (get, put)
 import Control.Monad.Trans (liftIO)
 import Data.IORef          (IORef, newIORef, readIORef, modifyIORef)
 
-import Haschoo.Types           ( Haschoo, withHaschoo
+import Haschoo.Types           ( Haschoo, runHaschoo
                                , ScmValue(..), isTrue
                                , Context, mkContext, contextSize
                                , addToContext, contextLookup)
@@ -36,18 +36,17 @@ scmLambda (ScmDottedList ps (ScmIdentifier t) : body) = mkΛ ps (Just t) body
 scmLambda _ = throwError "Invalid parameters to lambda"
 
 mkΛ :: [ScmValue] -> Maybe String -> [ScmValue] -> Haschoo ScmValue
-mkΛ formals tailParams body = ScmPrim name . func <$> get
+mkΛ formals tailParams body = ScmFunc name . func <$> get
  where
-   func ctx = \xs -> do
-      case compareLengths xs formals of
-           (LT,_)      -> tooFewArgs name
+   func ctx = \args -> do
+      case compareLengths args formals of
+           (LT,_)      -> return$ tooFewArgs name
            (order,len) -> do
-              args <- mapM eval xs
               case tailParams of
                    Nothing ->
                       if order == EQ
                          then make id args
-                         else tooManyArgs name
+                         else return$ tooManyArgs name
                    Just n ->
                       let (normal, tailArgs) = splitAt len args
                        in make (++[n]) (normal ++ [ScmList tailArgs])
@@ -59,13 +58,13 @@ mkΛ formals tailParams body = ScmPrim name . func <$> get
                      c   = subContext ns' args
                   in case compareLength ns' (contextSize c) of
                           EQ -> do
-                             c' <- liftIO $ newIORef c
-                             withHaschoo (c':ctx) $ evalBody body
+                             c' <- newIORef c
+                             runHaschoo (c':ctx) $ evalBody body
 
-                          LT -> duplicateParam
+                          LT -> return duplicateParam
                           GT -> error "lambda :: the impossible happened"
 
-              Nothing -> badParam
+              Nothing -> return badParam
 
       paramNames = mapM f formals
        where

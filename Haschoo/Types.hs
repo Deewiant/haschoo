@@ -8,18 +8,17 @@
 {-# LANGUAGE BangPatterns, GeneralizedNewtypeDeriving #-}
 
 module Haschoo.Types
-   ( Haschoo, runHaschoo, withHaschoo
+   ( Haschoo, runHaschoo
    , ScmValue(..), isTrue, pairToList
    , Context(..), mkContext, addToContext, contextLookup, contextSize
    , scmShow
    ) where
 
 import Control.Applicative             ((<$>))
-import Control.Monad                   (liftM2, (<=<))
-import Control.Monad.Error             ( ErrorT, MonadError, runErrorT
-                                       , throwError)
+import Control.Monad                   (liftM2)
+import Control.Monad.Error             (ErrorT, MonadError, runErrorT)
 import Control.Monad.State.Strict      (StateT, MonadState, evalStateT)
-import Control.Monad.Trans             (MonadIO, liftIO)
+import Control.Monad.Trans             (MonadIO)
 import Data.Complex                    (Complex((:+)))
 import Data.IORef                      (IORef, readIORef)
 import Data.IntMap                     (IntMap)
@@ -32,7 +31,7 @@ import Text.Show.Functions             ()
 import qualified Data.IntMap as IM
 import qualified Data.ListTrie.Patricia.Map.Enum as TM
 
-import Haschoo.Utils (ErrOr, swap, showScmList, (.:))
+import Haschoo.Utils (ErrOr, swap, showScmList)
 
 -- Our main monad
 newtype Haschoo a = Haschoo (StateT HaschState (ErrorT String IO) a)
@@ -42,11 +41,6 @@ runHaschoo :: HaschState -> Haschoo a -> IO (ErrOr a)
 runHaschoo state (Haschoo h) = runErrorT $ evalStateT h state
 
 type HaschState = [IORef Context]
-
--- Like 'local' in MonadReader. (Not like withStateT in MonadState, which
--- evidently does something different.)
-withHaschoo :: HaschState -> Haschoo a -> Haschoo a
-withHaschoo = (either throwError return <=<) . liftIO .: runHaschoo
 
 data ScmValue = ScmPrim       String !([ScmValue] -> Haschoo   ScmValue)
               | ScmFunc       String !([ScmValue] -> IO (ErrOr ScmValue))
