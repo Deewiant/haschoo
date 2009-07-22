@@ -5,9 +5,10 @@ module Haschoo.Evaluator.Standard.PairsLists (procedures) where
 import Control.Applicative ((<$>))
 import Control.Arrow       ((&&&), second)
 import Control.Monad       (join, replicateM, (>=>))
-import Control.Monad.Loops (dropWhileM)
+import Control.Monad.Loops (dropWhileM, firstM)
 import Data.IORef          (IORef, newIORef, readIORef, writeIORef)
 import Data.List           (genericDrop)
+import Data.Maybe          (fromMaybe)
 
 import Haschoo.Types                          (ScmValue(..))
 import Haschoo.Utils                          (ErrOr, ($<), ptrEq)
@@ -35,7 +36,10 @@ procedures = map (\(a,b) -> (a, ScmFunc a b)) $
    , ("list-ref", scmListRef)
    , ("memq",     scmMemq)
    , ("memv",     scmMemv)
-   , ("member",   scmMember) ]
+   , ("member",   scmMember)
+   , ("assq",     scmAssq)
+   , ("assv",     scmAssv)
+   , ("assoc",    scmAssoc) ]
 
 ---- Pairs
 
@@ -257,6 +261,38 @@ scmFind p s [obj, list] =
 
 scmFind _ s (_:_:_) = return$ tooManyArgs s
 scmFind _ s _       = return$ tooFewArgs  s
+
+--- assq assv assoc
+
+scmAssq, scmAssv, scmAssoc :: [ScmValue] -> IO (ErrOr ScmValue)
+scmAssq  = scmLookup scmEq    "assq"
+scmAssv  = scmLookup scmEqv   "assv"
+scmAssoc = scmLookup scmEqual "assoc"
+
+scmLookup :: (ScmValue -> ScmValue -> IO Bool) -> String
+          -> [ScmValue] -> IO (ErrOr ScmValue)
+scmLookup p s [obj, list] =
+   case list of
+        ScmList _   -> go list
+        ScmPair _ _ -> go list
+        _           -> return$ notList s
+ where
+   go (ScmList xs) = Right . fromMaybe (ScmBool False) <$> firstM match xs
+   go (ScmPair a b) = do
+      a'    <- readIORef a
+      found <- match a'
+      if found
+         then return . Right $ a'
+         else readIORef b >>= go
+
+   go _ = return$ notList s
+
+   match (ScmPair a _)   = p obj =<< readIORef a
+   match (ScmList (a:_)) = p obj a
+   match _               = return False
+
+scmLookup _ s (_:_:_) = return$ tooManyArgs s
+scmLookup _ s _       = return$ tooFewArgs  s
 
 ---- Utils
 
