@@ -6,10 +6,12 @@ import Control.Applicative ((<$>))
 import Control.Arrow       ((&&&), second)
 import Control.Monad       (join, replicateM, (>=>))
 import Data.IORef          (IORef, newIORef, readIORef, writeIORef)
+import Data.List           (genericDrop)
 
-import Haschoo.Types           (ScmValue(..))
-import Haschoo.Utils           (ErrOr, ($<), ptrEq)
-import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
+import Haschoo.Types                      (ScmValue(..))
+import Haschoo.Utils                      (ErrOr, ($<), ptrEq)
+import Haschoo.Evaluator.Utils            (tooFewArgs, tooManyArgs)
+import Haschoo.Evaluator.Standard.Numeric (asInt)
 
 procedures :: [(String, ScmValue)]
 procedures = map (\(a,b) -> (a, ScmFunc a b)) $
@@ -22,12 +24,13 @@ procedures = map (\(a,b) -> (a, ScmFunc a b)) $
 
    ++ carCdrCompositions ++
 
-   [ ("null?",   return . fmap ScmBool . scmIsNull)
-   , ("list?",   fmap (fmap ScmBool) . scmIsList)
-   , ("list",    fmap Right . scmList)
-   , ("length",  scmLength)
-   , ("append",  scmAppend)
-   , ("reverse", scmReverse) ]
+   [ ("null?",    return . fmap ScmBool . scmIsNull)
+   , ("list?",    fmap (fmap ScmBool) . scmIsList)
+   , ("list",     fmap Right . scmList)
+   , ("length",   scmLength)
+   , ("append",   scmAppend)
+   , ("reverse",  scmReverse)
+   , ("list-ref", scmListRef) ]
 
 ---- Pairs
 
@@ -200,6 +203,23 @@ scmReverse [x@(ScmPair _ _)] = go [] x
 scmReverse [_] = return$ notList     "reverse"
 scmReverse []  = return$ tooFewArgs  "reverse"
 scmReverse _   = return$ tooManyArgs "reverse"
+
+scmListRef :: [ScmValue] -> IO (ErrOr ScmValue)
+scmListRef [x, n] =
+   case fmap snd $ asInt "list-ref" n of
+        Right i -> f x i
+        Left  s -> return (Left s)
+ where
+   f (ScmList xs)  i = return$ case genericDrop i xs of
+                                    []  -> fail "list-ref :: overlarge index"
+                                    v:_ -> Right v
+
+   f (ScmPair a _) 0 = Right <$> readIORef a
+   f (ScmPair _ b) i = readIORef b >>= flip f (i-1)
+   f _             _ = return$ notList "list-ref"
+
+scmListRef (_:_:_) = return$ tooManyArgs "list-ref"
+scmListRef _       = return$ tooFewArgs  "list-ref"
 
 ---- Utils
 

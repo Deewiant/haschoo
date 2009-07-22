@@ -3,7 +3,7 @@
 {-# LANGUAGE Rank2Types #-}
 
 module Haschoo.Evaluator.Standard.Numeric
-   (procedures, isNumeric, isExact, numEq) where
+   (procedures, isNumeric, isExact, numEq, asInt) where
 
 import Control.Arrow ((&&&), (***))
 import Control.Monad (ap, foldM)
@@ -476,10 +476,10 @@ scmToNumber _  =
 -------------
 
 notInt, notNum, notReal, notRat :: String -> ErrOr a
-notInt      = fail . ("Noninteger argument to primitive procedure " ++)
-notNum      = fail . ("Nonnumeric argument to primitive procedure " ++)
-notReal     = fail . ("Nonreal argument to primitive procedure " ++)
-notRat      = fail . ("Nonrational argument to primitive procedure " ++)
+notInt  = fail . ("Noninteger argument to primitive procedure " ++)
+notNum  = fail . ("Nonnumeric argument to primitive procedure " ++)
+notReal = fail . ("Nonreal argument to primitive procedure " ++)
+notRat  = fail . ("Nonrational argument to primitive procedure " ++)
 
 isNumeric, isInteger :: ScmValue -> Bool
 isNumeric (ScmInt     _) = True
