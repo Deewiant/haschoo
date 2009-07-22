@@ -26,6 +26,7 @@ import Data.IntMap                     (IntMap)
 import Data.ListTrie.Patricia.Map.Enum (TrieMap)
 import Data.Maybe                      (fromMaybe)
 import Data.Ratio                      (numerator, denominator)
+import System.IO.Unsafe                (unsafeInterleaveIO)
 import Text.Show.Functions             ()
 
 import qualified Data.IntMap as IM
@@ -133,17 +134,15 @@ scmShow (ScmDottedList a b) = do
 
 scmShow (ScmPair car cdr) = do
    a  <- readIORef car
-   b  <- readIORef cdr
    as <- scmShow a
-   ('(':) . (as ++) <$> go b
+   ('(':) . (as ++) <$> (unsafeInterleaveIO $ readIORef cdr >>= go)
  where
    go x@(ScmList _)         = (' ':) . tail <$> scmShow x
    go x@(ScmDottedList _ _) = (' ':) . tail <$> scmShow x
 
    go (ScmPair x y) = do
       a <- readIORef x
-      b <- readIORef y
       as <- scmShow a
-      (' ':) . (as ++) <$> go b
+      (' ':) . (as ++) <$> (unsafeInterleaveIO $ readIORef y >>= go)
 
    go x = (" . "++) . (++")") <$> scmShow x
