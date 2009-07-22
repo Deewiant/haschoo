@@ -142,6 +142,9 @@ scmShow (ScmPair car cdr) = do
    as <- scmShow a
    ('(':) . (as ++) <$> go b
  where
+   go x@(ScmList _)         = (' ':) . tail <$> scmShow x
+   go x@(ScmDottedList _ _) = (' ':) . tail <$> scmShow x
+
    go (ScmPair x y) = do
       a <- readIORef x
       b <- readIORef y

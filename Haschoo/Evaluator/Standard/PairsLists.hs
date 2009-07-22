@@ -25,14 +25,12 @@ scmIsPair []            = tooFewArgs  "pair?"
 scmIsPair _             = tooManyArgs "pair?"
 
 scmCons :: [ScmValue] -> IO (ErrOr ScmValue)
-scmCons [a, ScmList       b]   = return.Right $ ScmList       (a:b)
-scmCons [a, ScmDottedList b c] = return.Right $ ScmDottedList (a:b) c
-scmCons [a, b]                 = do
+scmCons [a, b]  = do
    x <- newIORef a
    y <- newIORef b
    return.Right $ ScmPair x y
-scmCons (_:_:_)                = return$ tooManyArgs "cons"
-scmCons _                      = return$ tooFewArgs  "cons"
+scmCons (_:_:_) = return$ tooManyArgs "cons"
+scmCons _       = return$ tooFewArgs  "cons"
 
 scmCar, scmCdr :: [ScmValue] -> IO (ErrOr ScmValue)
 scmCar [ScmPair a _]           = return . Right =<< readIORef a
