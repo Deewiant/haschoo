@@ -10,7 +10,7 @@ import Data.IORef          (IORef, newIORef, readIORef, writeIORef)
 import Data.List           (genericDrop)
 import Data.Maybe          (fromMaybe)
 
-import Haschoo.Types                          (ScmValue(..))
+import Haschoo.Types                          (ScmValue(..), pairToList)
 import Haschoo.Utils                          (ErrOr, ($<), ptrEq)
 import Haschoo.Evaluator.Utils                (tooFewArgs, tooManyArgs)
 import Haschoo.Evaluator.Standard.Equivalence (scmEq, scmEqv, scmEqual)
@@ -43,6 +43,8 @@ procedures = map (\(a,b) -> (a, ScmFunc a b)) $
 
 ---- Pairs
 
+--- pair?
+
 scmIsPair :: [ScmValue] -> ErrOr Bool
 scmIsPair [ScmPair _ _]       = Right True
 scmIsPair [ScmList _]         = Right True
@@ -50,6 +52,8 @@ scmIsPair [ScmDottedList _ _] = Right True
 scmIsPair [_]                 = Right False
 scmIsPair []                  = tooFewArgs  "pair?"
 scmIsPair _                   = tooManyArgs "pair?"
+
+--- cons
 
 scmCons :: [ScmValue] -> IO (ErrOr ScmValue)
 scmCons [a, b]  = do
@@ -59,12 +63,14 @@ scmCons [a, b]  = do
 scmCons (_:_:_) = return$ tooManyArgs "cons"
 scmCons _       = return$ tooFewArgs  "cons"
 
+--- car cdr
+
 scmCar, scmCdr :: String -> [ScmValue] -> IO (ErrOr ScmValue)
 scmCar _ [ScmPair a _]           = return . Right =<< readIORef a
 scmCar _ [ScmList (a:_)]         = return . Right $ a
 scmCar _ [ScmDottedList (a:_) _] = return . Right $ a
 scmCar s [ScmList []]            = return . fail $ s ++ " :: empty list"
-scmCar s [_]                     = notPair s
+scmCar s [_]                     = return$ notPair s
 scmCar s []                      = return$ tooFewArgs  s
 scmCar s _                       = return$ tooManyArgs s
 
@@ -73,23 +79,27 @@ scmCdr _ [ScmList (_:bs)]        = return . Right $ ScmList bs
 scmCdr _ [ScmDottedList [_]   b] = return . Right $ b
 scmCdr _ [ScmDottedList (_:a) b] = return . Right $ ScmDottedList a b
 scmCdr s [ScmList []]            = return . fail $ s ++ " :: empty list"
-scmCdr s [_]                     = notPair s
+scmCdr s [_]                     = return$ notPair s
 scmCdr s []                      = return$ tooFewArgs  s
 scmCdr s _                       = return$ tooManyArgs s
 
+--- set-car! set-cdr!
+
 scmSetCar, scmSetCdr :: [ScmValue] -> IO (ErrOr ScmValue)
-scmSetCar [ScmPair a _, v] = writeIORef a v >> return (Right ScmVoid)
-scmSetCar [_,_]            =         notPair     "set-car!"
-scmSetCar (_:_:_)          = return$ tooManyArgs "set-car!"
-scmSetCar _                = return$ tooFewArgs  "set-car!"
+scmSetCar = scmSet (\a _ v -> writeIORef a v) "set-car!"
+scmSetCdr = scmSet (\_ b v -> writeIORef b v) "set-cdr!"
 
-scmSetCdr [ScmPair _ b, v] = writeIORef b v >> return (Right ScmVoid)
-scmSetCdr [_,_]            =         notPair     "set-cdr!"
-scmSetCdr (_:_:_)          = return$ tooManyArgs "set-cdr!"
-scmSetCdr _                = return$ tooFewArgs  "set-cdr!"
+scmSet :: (IORef ScmValue -> IORef ScmValue -> ScmValue -> IO ()) -> String
+       -> [ScmValue] -> IO (ErrOr ScmValue)
 
-notPair :: String -> IO (ErrOr a)
-notPair = return . Left . ("Nonpair argument to " ++)
+scmSet f _ [ScmPair a b, v]       = f a b v >> return (Right ScmVoid)
+scmSet _ s [ScmList _, _]         = return$ immutable   s
+scmSet _ s [ScmDottedList _ _, _] = return$ immutable   s
+scmSet _ s [_,_]                  = return$ notPair     s
+scmSet _ s (_:_:_)                = return$ tooManyArgs s
+scmSet _ s _                      = return$ tooFewArgs  s
+
+--- caar cadr ... cddddr
 
 carCdrCompositions :: [(String, [ScmValue] -> IO (ErrOr ScmValue))]
 carCdrCompositions = map (name &&& join func)
@@ -110,6 +120,8 @@ carCdrCompositions = map (name &&& join func)
    next s f  (Right v) = f (name s) [v]
 
 ---- Lists
+
+--- null? list?
 
 scmIsNull :: [ScmValue] -> ErrOr Bool
 scmIsNull [ScmList []] = Right True
@@ -144,6 +156,8 @@ scmIsList [_]           = return$ Right False
 scmIsList []            = return$ tooFewArgs  "list?"
 scmIsList _             = return$ tooManyArgs "list?"
 
+--- list
+
 scmList :: [ScmValue] -> IO ScmValue
 scmList []     = return (ScmList [])
 scmList (x:xs) = do
@@ -151,6 +165,8 @@ scmList (x:xs) = do
    y  <- newIORef x
    z  <- newIORef ys
    return (ScmPair y z)
+
+--- length
 
 scmLength :: [ScmValue] -> IO (ErrOr ScmValue)
 scmLength [ScmPair _ p] = readIORef p >>= go 1
@@ -164,6 +180,8 @@ scmLength [ScmList xs]  = return . Right . ScmInt . toInteger $ length xs
 scmLength [_]           = return$ notList     "length"
 scmLength []            = return$ tooFewArgs  "length"
 scmLength _             = return$ tooManyArgs "length"
+
+--- append
 
 scmAppend :: [ScmValue] -> IO (ErrOr ScmValue)
 scmAppend [p@(ScmPair _ _), rhs] = next p
@@ -198,21 +216,21 @@ scmAppend [_,_]   = return$ notList     "append"
 scmAppend (_:_:_) = return$ tooManyArgs "append"
 scmAppend _       = return$ tooFewArgs  "append"
 
+--- reverse
+
 scmReverse :: [ScmValue] -> IO (ErrOr ScmValue)
 scmReverse [ScmList xs]      = fmap (Right . fst) . pairify $ reverse xs
-scmReverse [x@(ScmPair _ _)] = go [] x
- where
-   go rs (ScmList xs)  = fmap (Right . fst) . pairify $ reverse xs ++ rs
-   go rs (ScmPair a b) = do
-      a' <- readIORef a
-      b' <- readIORef b
-      go (a':rs) b'
+scmReverse [x@(ScmPair _ _)] = do
+   x' <- pairToList x
+   case x' of
+        Right (ScmList l) -> fmap (Right . fst) . pairify $ reverse l
+        Left _            -> return $ notList "reverse"
+        Right _           -> error "reverse :: the impossible happened"
+scmReverse [_]               = return$ notList     "reverse"
+scmReverse []                = return$ tooFewArgs  "reverse"
+scmReverse _                 = return$ tooManyArgs "reverse"
 
-   go _ _ = return$ notList "reverse"
-
-scmReverse [_] = return$ notList     "reverse"
-scmReverse []  = return$ tooFewArgs  "reverse"
-scmReverse _   = return$ tooManyArgs "reverse"
+--- list-ref
 
 scmListRef :: [ScmValue] -> IO (ErrOr ScmValue)
 scmListRef [x, n] =
@@ -297,8 +315,10 @@ scmLookup _ s _       = return$ tooFewArgs  s
 
 ---- Utils
 
-notList :: String -> ErrOr a
-notList = fail . ("Nonlist argument to "++)
+immutable, notPair, notList :: String -> ErrOr a
+immutable = fail . ("Immutable argument to " ++)
+notPair   = fail . ("Nonpair argument to " ++)
+notList   = fail . ("Nonlist argument to "++)
 
 -- ScmList -> ScmPair, returns the tail pointer if it wasn't empty
 pairify :: [ScmValue] -> IO (ScmValue, Maybe (IORef ScmValue))
