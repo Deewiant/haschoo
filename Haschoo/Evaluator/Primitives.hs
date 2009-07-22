@@ -54,7 +54,7 @@ mkΛ formals tailParams body = ScmPrim name . func <$> get
     where
       make mkParams args =
          case paramNames of
-              Right ns ->
+              Just ns ->
                  let ns' = mkParams ns
                      c   = subContext ns' args
                   in case compareLength ns' (contextSize c) of
@@ -65,12 +65,12 @@ mkΛ formals tailParams body = ScmPrim name . func <$> get
                           LT -> duplicateParam
                           GT -> error "lambda :: the impossible happened"
 
-              Left bad -> badParam bad
+              Nothing -> badParam
 
       paramNames = mapM f formals
        where
-         f (ScmIdentifier x) = Right x
-         f x                 = Left (scmShow x)
+         f (ScmIdentifier x) = Just x
+         f _                 = Nothing
 
    -- TODO: these should be cached somewhere somehow, not fully recreated every
    -- time: we just need to substitute the parameter values
@@ -79,8 +79,8 @@ mkΛ formals tailParams body = ScmPrim name . func <$> get
 
    duplicateParam =
       throwError.concat $ ["Duplicate in parameter list of ", name]
-   badParam bad   =
-      throwError.concat $ ["Invalid parameter '", bad, "' to ", name]
+   badParam      =
+      throwError.concat $ ["Invalid identifier in parameter list of ", name]
 
 scmQuote :: [ScmValue] -> Haschoo ScmValue
 scmQuote [x] = return x

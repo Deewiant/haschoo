@@ -14,13 +14,14 @@ module Haschoo.Types
    , scmShow
    ) where
 
+import Control.Applicative             ((<$>))
 import Control.Monad                   (liftM2)
 import Control.Monad.Error             ( ErrorT, MonadError, runErrorT
                                        , throwError)
 import Control.Monad.State.Strict      (StateT, MonadState, evalStateT, get)
 import Control.Monad.Trans             (MonadIO, liftIO)
 import Data.Complex                    (Complex((:+)))
-import Data.IORef                      (IORef)
+import Data.IORef                      (IORef, readIORef)
 import Data.IntMap                     (IntMap)
 import Data.ListTrie.Patricia.Map.Enum (TrieMap)
 import Data.Maybe                      (fromMaybe)
@@ -61,7 +62,7 @@ data ScmValue = ScmPrim       String !([ScmValue] -> Haschoo   ScmValue)
               | ScmReal       !Double
               | ScmComplex    !(Complex Double)
               | ScmIdentifier !String
-              | ScmPair       !ScmValue !ScmValue
+              | ScmPair       !(IORef ScmValue) !(IORef ScmValue)
 
               -- These two are only for literal lists, appearing only directly
               -- from the parser
@@ -70,7 +71,6 @@ data ScmValue = ScmPrim       String !([ScmValue] -> Haschoo   ScmValue)
 
               -- The "unspecified value" returned by IO procedures and such
               | ScmVoid
- deriving Show
 
 isTrue :: ScmValue -> Bool
 isTrue (ScmBool False) = False
@@ -78,7 +78,6 @@ isTrue _               = True
 
 data Context = Context { idMap  :: TrieMap Char Int
                        , valMap :: IntMap ScmValue }
- deriving Show
 
 mkContext :: [(String, ScmValue)] -> Context
 mkContext namedVals = Context ids vals
@@ -99,44 +98,54 @@ contextLookup s = liftM2 fmap (,) (TM.lookup s . idMap)
 contextSize :: Context -> Int
 contextSize = IM.size . valMap
 
----- Show functions
-
-scmShow :: ScmValue -> String
-scmShow ScmVoid           = "" -- Has no representation
-scmShow (ScmBool b)       = '#' : if b then "t" else "f"
-scmShow (ScmPrim s _)     = s
-scmShow (ScmFunc s _)     = s
-scmShow (ScmIdentifier s) = s
+scmShow :: ScmValue -> IO String
+scmShow ScmVoid           = return "" -- Has no representation
+scmShow (ScmBool b)       = return$ '#' : if b then "t" else "f"
+scmShow (ScmPrim s _)     = return s
+scmShow (ScmFunc s _)     = return s
+scmShow (ScmIdentifier s) = return s
 scmShow (ScmList xs)      = showScmList scmShow xs
-scmShow (ScmInt n)        = show n
+scmShow (ScmInt n)        = return$ show n
 scmShow (ScmReal n)
-   | isNaN      n = "+nan.#"
-   | isInfinite n = (if n < 0 then '-' else '+') : "inf.#"
-   | otherwise    = show n
+   | isNaN      n = return "+nan.#"
+   | isInfinite n = return$ (if n < 0 then '-' else '+') : "inf.#"
+   | otherwise    = return$ show n
 scmShow (ScmRat n) =
-   concat [show (numerator n), "/", show (denominator n)]
+   return$ concat [show (numerator n), "/", show (denominator n)]
 
-scmShow (ScmComplex (a :+ b)) =
-   let bs = scmShow (ScmReal b)
-    in concat [ scmShow (ScmReal a)
-              , if head bs `elem` "-+" then [] else "+"
-              , bs
-              , "i" ]
+scmShow (ScmComplex (a :+ b)) = do
+   bs <- scmShow (ScmReal b)
+   as <- scmShow (ScmReal a)
+   return$ concat [ as
+                  , if head bs `elem` "-+" then [] else "+"
+                  , bs
+                  , "i" ]
 
-scmShow (ScmChar c) | c == ' '  = "#\\space"
-                    | c == '\n' = "#\\newline"
-                    | otherwise = "#\\" ++ [c]
+scmShow (ScmChar c) | c == ' '  = return  "#\\space"
+                    | c == '\n' = return  "#\\newline"
+                    | otherwise = return$ "#\\" ++ [c]
 
-scmShow (ScmString s) = '"' : foldr ((.) . f) id s "\""
+scmShow (ScmString s) = return$ '"' : foldr ((.) . f) id s "\""
  where
    f c | c == '\\' = showString "\\\\"
        | c == '\"' = showString "\\\""
        | otherwise = showChar c
 
-scmShow (ScmDottedList as b) =
-   concat [init (showScmList scmShow as), " . ", scmShow b, ")"]
+scmShow (ScmDottedList a b) = do
+   as <- showScmList scmShow a
+   bs <- scmShow b
+   return$ concat [init as, " . ", bs, ")"]
 
-scmShow (ScmPair car cdr) = '(' : scmShow car ++ go cdr
+scmShow (ScmPair car cdr) = do
+   a  <- readIORef car
+   b  <- readIORef cdr
+   as <- scmShow a
+   ('(':) . (as ++) <$> go b
  where
-   go (ScmPair x y) = " " ++ scmShow x ++ go y
-   go b             = " . " ++ scmShow b ++ ")"
+   go (ScmPair x y) = do
+      a <- readIORef x
+      b <- readIORef y
+      as <- scmShow a
+      (' ':) . (as ++) <$> go b
+
+   go x = (" . "++) . (++")") <$> scmShow x

@@ -17,14 +17,14 @@ scmWrite, scmDisplay :: [ScmValue] -> IO (ErrOr ScmValue)
 scmWrite   = scmPrint scmShow "write"
 scmDisplay = scmPrint f "display"
  where
-   f (ScmString s) = s
-   f (ScmChar   c) = [c]
+   f (ScmString s) = return s
+   f (ScmChar   c) = return [c]
    f (ScmList   l) = showScmList f l
    f x             = scmShow x
 
 -- TODO: always goes to stdout
-scmPrint :: (ScmValue -> String) -> String -> [ScmValue] -> IO (ErrOr ScmValue)
-scmPrint f _ [x]   = putStr (f x) >> return (Right ScmVoid)
+scmPrint :: (ScmValue -> IO String) -> String -> [ScmValue] -> IO (ErrOr ScmValue)
+scmPrint f _ [x]   = f x >>= putStr >> return (Right ScmVoid)
 scmPrint _ s [_,_] = return.Left $ s ++ " :: output to port not implemented"
 scmPrint _ s []    = return $ tooFewArgs  s
 scmPrint _ s _     = return $ tooManyArgs s

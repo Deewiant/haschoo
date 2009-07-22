@@ -2,6 +2,7 @@
 
 module Haschoo.Utils where
 
+import Control.Applicative ((<$>))
 import Control.Monad       (liftM)
 import Control.Monad.Error () -- Monad ErrOr
 import Control.Monad.State (MonadState, get, put)
@@ -30,8 +31,9 @@ compareLength []     _         = LT
 compareLength (_:_)  0         = GT
 compareLength (_:as) n         = compareLength as (n-1)
 
-showScmList :: (a -> String) -> [a] -> String
-showScmList f xs = concat ["(", intercalate " " (map f xs), ")"]
+showScmList :: (a -> IO String) -> [a] -> IO String
+showScmList f xs =
+   ("("++) . (++")") . intercalate " " <$> lazyMapM f xs
 
 void :: Functor f => f a -> f ()
 void = fmap (const ())
