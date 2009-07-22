@@ -6,6 +6,7 @@ import Control.Applicative ((<$>))
 import Control.Arrow       ((&&&), second)
 import Control.Monad       (join, replicateM, (>=>))
 import Control.Monad.Loops (dropWhileM, firstM)
+import Data.Foldable       (foldrM)
 import Data.IORef          (IORef, newIORef, readIORef, writeIORef)
 import Data.List           (genericDrop)
 import Data.Maybe          (fromMaybe)
@@ -184,12 +185,32 @@ scmLength _             = return$ tooManyArgs "length"
 --- append
 
 scmAppend :: [ScmValue] -> IO (ErrOr ScmValue)
-scmAppend [p@(ScmPair _ _), rhs] = next p
+scmAppend args@(_:_) = foldrM fold (Left "") args
  where
+   -- The last argument is allowed to be a nonlist: this is a bit of a hack to
+   -- catch that case
+   --
+   -- If we were to just match on ScmList [] in f, we'd allow an arbitrary
+   -- number of '() to follow the final argument
+   fold x (Left "") = return (Right x)
+
+   fold _ err@(Left _) = return err
+   fold a (Right b)    = f a b
+
+   f (p@(ScmPair _ _)) rhs = next rhs p
+   f (ScmList xs)      rhs = do
+      (xs', fin) <- pairify xs
+      case fin of
+           Nothing -> return . Right $ rhs
+           Just p  -> do
+              writeIORef p rhs
+              return . Right $ xs'
+
+   f _ _ = return$ notList "append"
+
    -- Builds up the list as we iterate through it
-   next :: ScmValue -> IO (ErrOr ScmValue)
-   next (ScmPair a b) = do
-      b' <- go =<< readIORef b
+   next rhs (ScmPair a b) = do
+      b' <- go rhs =<< readIORef b
       case b' of
            Left  _ -> return b'
            Right y -> do
@@ -197,24 +218,13 @@ scmAppend [p@(ScmPair _ _), rhs] = next p
               newB <- newIORef y
               return . Right $ ScmPair newA newB
 
-   next _ = error "append :: the impossible happened"
+   next _ _ = error "append :: the impossible happened"
 
-   go :: ScmValue -> IO (ErrOr ScmValue)
-   go x@(ScmPair _ _) = next x
-   go x@(ScmList _)   = scmAppend [x, rhs]
-   go _               = return$ notList "append"
+   go rhs x@(ScmPair _ _) = next rhs x
+   go rhs x@(ScmList _)   = f x rhs
+   go _   _               = return$ notList "append"
 
-scmAppend [ScmList xs, rhs] = do
-   (xs', fin) <- pairify xs
-   case fin of
-        Nothing -> return . Right $ rhs
-        Just p  -> do
-           writeIORef p rhs
-           return . Right $ xs'
-
-scmAppend [_,_]   = return$ notList     "append"
-scmAppend (_:_:_) = return$ tooManyArgs "append"
-scmAppend _       = return$ tooFewArgs  "append"
+scmAppend [] = return$ tooFewArgs  "append"
 
 --- reverse
 
