@@ -98,7 +98,7 @@ list =
 vector :: Parser Char ScmValue
 vector = do
    one '#'
-   error "vectors not yet supported!"
+   fail "vectors not yet supported!"
    --ScmVector <$> bracket (one '(') (atmosphere >> one ')') values
 
 number :: Int -> Parser Char ScmValue
