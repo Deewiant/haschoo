@@ -2,11 +2,10 @@
 
 module Haschoo.Evaluator.Standard.Equivalence (procedures) where
 
-import Control.Arrow         ((&&&))
-import System.Mem.StableName (makeStableName)
+import Control.Arrow ((&&&))
 
 import Haschoo.Types                      (ScmValue(..))
-import Haschoo.Utils                      (ErrOr, ($<), (.:))
+import Haschoo.Utils                      (ErrOr, ($<), (.:), ptrEq)
 import Haschoo.Evaluator.Utils            (tooFewArgs, tooManyArgs)
 import Haschoo.Evaluator.Standard.Numeric (isExact, isNumeric, numEq)
 
@@ -45,12 +44,6 @@ scmEqual (ScmList x) (ScmList y) = go x y
 
 scmEqual (ScmString a) (ScmString b) = return$ a == b
 scmEqual a b = scmEqv a b
-
-ptrEq :: a -> a -> IO Bool
-ptrEq x y = do
-   nx <- makeStableName x
-   ny <- makeStableName y
-   return (nx == ny)
 
 scmEquivalence :: (ScmValue -> ScmValue -> IO Bool) -> String
                -> [ScmValue] -> IO (ErrOr Bool)

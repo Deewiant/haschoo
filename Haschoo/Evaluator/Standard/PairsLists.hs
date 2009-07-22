@@ -7,7 +7,7 @@ import Control.Monad (join, replicateM, (>=>))
 import Data.IORef    (newIORef, readIORef, writeIORef)
 
 import Haschoo.Types           (ScmValue(..))
-import Haschoo.Utils           (ErrOr, ($<))
+import Haschoo.Utils           (ErrOr, ($<), ptrEq)
 import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
 
 procedures :: [(String, ScmValue)]
@@ -18,7 +18,13 @@ procedures = map (\(a,b) -> (a, ScmFunc a b)) $
    , "cdr" $< id &&& scmCdr
    , ("set-car!", scmSetCar)
    , ("set-cdr!", scmSetCdr) ]
-   ++ carCdrCompositions
+
+   ++ carCdrCompositions ++
+
+   [ ("null?", return . fmap ScmBool . scmIsNull)
+   , ("list?", fmap (fmap ScmBool) . scmIsList) ]
+
+---- Pairs
 
 scmIsPair :: [ScmValue] -> ErrOr Bool
 scmIsPair [ScmPair _ _] = Right True
@@ -83,3 +89,38 @@ carCdrCompositions = map (name &&& join func)
 
    next _ _ x@(Left _) = return x
    next s f  (Right v) = f (name s) [v]
+
+---- Lists
+
+scmIsNull :: [ScmValue] -> ErrOr Bool
+scmIsNull [ScmList []] = Right True
+scmIsNull [_]          = Right False
+scmIsNull []           = tooFewArgs  "null?"
+scmIsNull _            = tooManyArgs "null?"
+
+scmIsList :: [ScmValue] -> IO (ErrOr Bool)
+scmIsList [ScmList _]   = return$ Right True
+scmIsList [ScmPair _ b] = fmap Right $ readIORef b >>= join go
+ where
+   go slow@(ScmPair _ sn) fast@(ScmPair _ fn) = do
+      fn' <- readIORef fn
+      case fn' of
+           ScmPair _ fn2 -> do
+              eq <- ptrEq fast fn'
+              if eq
+                 then return False -- Cycle
+                 else do
+                    fn2' <- readIORef fn2
+                    case fn2' of
+                         ScmPair _ _ -> readIORef sn >>= flip go fn2'
+                         ScmList _   -> return True
+                         _           -> return False
+           ScmList _ -> return True
+           _         -> return False
+
+   go _ (ScmList _) = return True
+   go _ _           = return False
+
+scmIsList [_]           = return$ Right False
+scmIsList []            = return$ tooFewArgs  "list?"
+scmIsList _             = return$ tooManyArgs "list?"

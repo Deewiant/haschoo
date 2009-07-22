@@ -2,13 +2,14 @@
 
 module Haschoo.Utils where
 
-import Control.Applicative ((<$>))
-import Control.Monad       (liftM)
-import Control.Monad.Error () -- Monad ErrOr
-import Control.Monad.State (MonadState, get, put)
-import Control.Monad.Trans (MonadIO, liftIO)
-import Data.List           (intercalate)
-import System.IO.Unsafe    (unsafeInterleaveIO)
+import Control.Applicative   ((<$>))
+import Control.Monad         (liftM)
+import Control.Monad.Error   () -- Monad ErrOr
+import Control.Monad.State   (MonadState, get, put)
+import Control.Monad.Trans   (MonadIO, liftIO)
+import Data.List             (intercalate)
+import System.IO.Unsafe      (unsafeInterleaveIO)
+import System.Mem.StableName (makeStableName)
 
 type ErrOr = Either String
 
@@ -54,3 +55,9 @@ infixl 0 $<
 infixr 9 .:
 (.:) :: (d -> c) -> (a -> b -> d) -> a -> b -> c
 f .: g = \x y -> f (g x y)
+
+ptrEq :: a -> a -> IO Bool
+ptrEq x y = do
+   nx <- makeStableName x
+   ny <- makeStableName y
+   return (nx == ny)
