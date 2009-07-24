@@ -24,7 +24,8 @@ primitives = map (\(a,b) -> (a, ScmPrim a b)) $
    [ ("lambda", scmLambda)
    , ("quote",  scmQuote)
    , ("if",     scmIf)
-   , ("set!",   scmSet) ]
+   , ("set!",   scmSet)
+   , ("letrec", scmLetRec) ]
 
 scmLambda :: [ScmValue] -> Haschoo ScmValue
 scmLambda []                                          = tooFewArgs "lambda"
@@ -115,3 +116,36 @@ scmSet [ScmIdentifier var, expr] = do
 scmSet [_,_]   = throwError $ "Non-identifier argument to set!"
 scmSet (_:_:_) = tooManyArgs "set!"
 scmSet _       = tooFewArgs  "set!"
+
+scmLetRec :: [ScmValue] -> Haschoo ScmValue
+scmLetRec (ScmList l : b) = doLetRec l b
+scmLetRec [_]             = tooFewArgs "letrec"
+scmLetRec []              = tooFewArgs "letrec"
+scmLetRec _               = throwError $ "Invalid list of bindings to letrec"
+
+doLetRec :: [ScmValue] -> [ScmValue] -> Haschoo ScmValue
+doLetRec bindings body = do
+   ctxStack <- get
+   result   <- liftIO $ do
+                  ctx <- newIORef (mkContext [])
+                  let newStack = ctx:ctxStack
+                  err <- bind bindings newStack ctx
+                  case err of
+                       Just s  -> return (Left s)
+                       Nothing ->
+                          runHaschoo newStack $ evalBody body
+
+   case result of
+        Left  s -> throwError s
+        Right v -> return v
+ where
+   bind (ScmList [ScmIdentifier var, val] : bs) ctxStack ctx = do
+      val' <- runHaschoo ctxStack $ eval val
+      case val' of
+           Left  err -> return (Just err)
+           Right res -> do
+              modifyIORef ctx (addToContext var res)
+              bind bs ctxStack ctx
+
+   bind [] _ _ = return Nothing
+   bind _  _ _ = return (Just "Invalid binding to letrec")
