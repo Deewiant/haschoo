@@ -32,7 +32,7 @@ import Haschoo.Evaluator.Utils (tooFewArgs)
 
 -- TODO: syntax definitions
 evalToplevel :: [ScmValue] -> Haschoo ScmValue
-evalToplevel = evalBody
+evalToplevel = fmap last . mapM (evalBody . return)
 
 evalBody :: [ScmValue] -> Haschoo ScmValue
 evalBody (ScmList (ScmIdentifier "define":xs) : ds) =
