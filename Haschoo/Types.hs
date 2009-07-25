@@ -8,7 +8,7 @@
 {-# LANGUAGE BangPatterns, GeneralizedNewtypeDeriving #-}
 
 module Haschoo.Types
-   ( Haschoo, runHaschoo
+   ( Haschoo, runHaschoo, withHaschoo
    , ScmValue(..), MacroCall(..), isTrue, pairToList
    , Context(..), mkContext, addToContext, contextLookup, contextSize
    , scmShow
@@ -18,7 +18,7 @@ import Control.Applicative             ((<$>))
 import Control.Monad                   (liftM2)
 import Control.Monad.Error             (ErrorT, MonadError, runErrorT)
 import Control.Monad.State.Strict      (StateT, MonadState, evalStateT)
-import Control.Monad.Trans             (MonadIO)
+import Control.Monad.Trans             (MonadIO, liftIO)
 import Data.Complex                    (Complex((:+)))
 import Data.IORef                      (IORef, readIORef)
 import Data.IntMap                     (IntMap)
@@ -39,6 +39,10 @@ newtype Haschoo a = Haschoo (StateT HaschState (ErrorT String IO) a)
 
 runHaschoo :: HaschState -> Haschoo a -> IO (ErrOr a)
 runHaschoo state (Haschoo h) = runErrorT $ evalStateT h state
+
+-- Like 'local' of the Reader monad
+withHaschoo :: HaschState -> Haschoo a -> Haschoo a
+withHaschoo state h = either fail return =<< liftIO (runHaschoo state h)
 
 type HaschState = [IORef Context]
 

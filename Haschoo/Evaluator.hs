@@ -9,7 +9,7 @@ import           Control.Monad.Trans (liftIO)
 import           Data.IORef          (IORef, readIORef, modifyIORef)
 import qualified Data.IntMap as IM
 
-import Haschoo.Types           ( Haschoo, runHaschoo
+import Haschoo.Types           ( Haschoo, withHaschoo
                                , ScmValue( ScmPrim, ScmFunc, ScmMacro
                                          , ScmList, ScmDottedList
                                          , ScmVoid, ScmIdentifier)
@@ -78,12 +78,7 @@ eval (ScmDottedList (x:xs) y) = do
 eval v = return v
 
 evalMacro :: [IORef Context] -> Haschoo ScmValue -> Haschoo ScmValue
-evalMacro ctx f = do
-   expanded <- f
-   result   <- liftIO $ runHaschoo ctx (eval expanded)
-   case result of
-        Left  s   -> throwError s
-        Right val -> return val
+evalMacro ctx f = f >>= withHaschoo ctx . eval
 
 scmDefinition :: [ScmValue] -> Haschoo ()
 scmDefinition [ScmIdentifier var, expr] = define var expr

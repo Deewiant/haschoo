@@ -11,7 +11,7 @@ import Data.IORef          (IORef, newIORef, readIORef, modifyIORef)
 import Data.List           (find)
 import Data.Maybe          (isNothing)
 
-import Haschoo.Types           ( Haschoo, runHaschoo
+import Haschoo.Types           ( Haschoo, runHaschoo, withHaschoo
                                , ScmValue(..), MacroCall(..), isTrue
                                , Context, mkContext, contextSize
                                , addToContext, contextLookup)
@@ -132,30 +132,16 @@ scmLetRec _       = tooFewArgs "letrec"
 
 doLetRec :: [ScmValue] -> [ScmValue] -> Haschoo ScmValue
 doLetRec bindings body = do
-   ctxStack <- get
-   result   <- liftIO $ do
-                  ctx <- newIORef (mkContext [])
-                  let newStack = ctx:ctxStack
-                  err <- bind bindings newStack ctx
-                  case err of
-                       Just s  -> return (Left s)
-                       Nothing ->
-                          runHaschoo newStack $ evalBody body
-
-   case result of
-        Left  s -> throwError s
-        Right v -> return v
+   ctx      <- liftIO $ newIORef (mkContext [])
+   newStack <- fmap (ctx:) get
+   mapM_ (bind newStack ctx) bindings
+   withHaschoo newStack (evalBody body)
  where
-   bind (ScmList [ScmIdentifier var, val] : bs) ctxStack ctx = do
-      val' <- runHaschoo ctxStack $ eval val
-      case val' of
-           Left  err -> return (Just err)
-           Right res -> do
-              modifyIORef ctx (addToContext var res)
-              bind bs ctxStack ctx
+   bind ctxStack ctx (ScmList [ScmIdentifier var, val]) = do
+      evaled <- withHaschoo ctxStack (eval val)
+      liftIO $ modifyIORef ctx (addToContext var evaled)
 
-   bind [] _ _ = return Nothing
-   bind _  _ _ = return (Just "Invalid binding to letrec")
+   bind _  _ _ = throwError "Invalid binding to letrec"
 
 scmSyntaxRules :: [ScmValue] -> Haschoo ScmValue
 scmSyntaxRules (ScmList ls : rest) = do
@@ -197,10 +183,7 @@ scmLetSyntax (ScmList bindings : body@(_:_)) = do
    stack  <- get
    ctx    <- liftIO $ newIORef (mkContext [])
    mapM_ (go stack ctx) bindings
-   result <- liftIO $ runHaschoo (ctx:stack) (evalBody body)
-   case result of
-        Left err -> throwError err
-        Right v  -> return v
+   withHaschoo (ctx:stack) (evalBody body)
  where
    go stack ctx (ScmList [ScmIdentifier var, binding]) = do
       syntax <- eval binding
