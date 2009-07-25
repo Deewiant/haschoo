@@ -6,7 +6,7 @@ module Haschoo.Evaluator.Standard.Equivalence
 import Control.Arrow ((&&&))
 
 import Haschoo.Types                      (ScmValue(..), pairToList)
-import Haschoo.Utils                      (ErrOr, ($<), (.:), ptrEq)
+import Haschoo.Utils                      (ErrOr, ($<), (.:), eqWithM, ptrEq)
 import Haschoo.Evaluator.Utils            (tooFewArgs, tooManyArgs)
 import Haschoo.Evaluator.Standard.Numeric (isExact, isNumeric, numEq)
 
@@ -35,18 +35,11 @@ scmEq a b = if isNumeric a && isNumeric b
                then ptrEq  a b
                else scmEqv a b
 
-scmEqual (ScmList x) (ScmList y) = go x y
- where
-   go []     []     = return True
-   go []     _      = return False
-   go _      []     = return False
-   go (a:as) (b:bs) =
-      scmEqual a b >>= \e -> if e then go as bs else return False
-
+scmEqual (ScmList       x)   (ScmList       y)   = eqWithM scmEqual x y
 scmEqual (ScmDottedList x a) (ScmDottedList y b) = do
    ab <- scmEqual a b
    if ab
-      then scmEqual (ScmList x) (ScmList y)
+      then eqWithM scmEqual x y
       else return False
 
 scmEqual x@(ScmList _) y@(ScmPair _ _) =

@@ -10,9 +10,10 @@ import           Data.IORef          (readIORef, modifyIORef)
 import qualified Data.IntMap as IM
 
 import Haschoo.Types           ( Haschoo
-                               , ScmValue( ScmPrim, ScmFunc, ScmVoid
-                                         , ScmList, ScmIdentifier
-                                         , ScmDottedList)
+                               , ScmValue( ScmPrim, ScmFunc, ScmMacro
+                                         , ScmList, ScmDottedList
+                                         , ScmVoid, ScmIdentifier)
+                               , MacroCall(..)
                                , valMap, addToContext, contextLookup)
 import Haschoo.Utils           (lazyMapM, modifyM)
 import Haschoo.Evaluator.Utils (tooFewArgs)
@@ -63,10 +64,18 @@ eval (ScmList (x:xs)) = do
                 Left  s   -> throwError s
                 Right val -> return val
 
+        ScmMacro _ f -> f (MCList xs) >>= eval
+
         _ -> throwError "Can't apply non-function"
 
-eval (ScmDottedList _ _) = throwError "Ill-formed application: no dots allowed"
-eval v                   = return v
+eval (ScmDottedList (x:xs) y) = do
+   evaledHead <- eval x
+   case evaledHead of
+        ScmMacro _ f -> f (MCDotted xs y) >>= eval
+        _            ->
+           throwError "Ill-formed procedure application: no dots allowed"
+
+eval v = return v
 
 scmDefinition :: [ScmValue] -> Haschoo ()
 scmDefinition [ScmIdentifier var, expr] = define var expr

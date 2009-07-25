@@ -38,6 +38,25 @@ initLast [x]    = ([], x)
 initLast (x:xs) = first (x:) (initLast xs)
 initLast []     = error "initLast :: empty list"
 
+initLast2Maybe :: [a] -> Maybe ([a], a, a)
+initLast2Maybe [x,y]  = Just ([], x, y)
+initLast2Maybe (a:as) = fmap (\ ~(bs,x,y) -> (a:bs,x,y)) (initLast2Maybe as)
+initLast2Maybe []     = Nothing
+
+-- eqWithM p xs ys is kind of like allM (uncurry p) (zip xs ys) but takes into
+-- account the lengths of the lists (differing lengths aren't equal)
+--
+-- Essentially, monadic list equality according to the given predicate
+eqWithM :: Monad m => (a -> b -> m Bool) -> [a] -> [b] -> m Bool
+eqWithM _ [] [] = return True
+eqWithM _ _  [] = return False
+eqWithM _ [] _  = return False
+eqWithM p (x:xs) (y:ys) = do
+   b <- p x y
+   if b
+      then eqWithM p xs ys
+      else return False
+
 showScmList :: (a -> IO String) -> [a] -> IO String
 showScmList f xs =
    ("("++) . (++")") . intercalate " " <$> lazyMapM f xs

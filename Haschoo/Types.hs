@@ -9,7 +9,7 @@
 
 module Haschoo.Types
    ( Haschoo, runHaschoo
-   , ScmValue(..), isTrue, pairToList
+   , ScmValue(..), MacroCall(..), isTrue, pairToList
    , Context(..), mkContext, addToContext, contextLookup, contextSize
    , scmShow
    ) where
@@ -43,6 +43,7 @@ runHaschoo state (Haschoo h) = runErrorT $ evalStateT h state
 type HaschState = [IORef Context]
 
 data ScmValue = ScmPrim       String !([ScmValue] -> Haschoo   ScmValue)
+              | ScmMacro      String !(MacroCall  -> Haschoo ScmValue)
               | ScmFunc       String !([ScmValue] -> IO (ErrOr ScmValue))
               | ScmBool       !Bool
               | ScmChar       !Char
@@ -54,6 +55,9 @@ data ScmValue = ScmPrim       String !([ScmValue] -> Haschoo   ScmValue)
               | ScmIdentifier !String
               | ScmPair       !(IORef ScmValue) !(IORef ScmValue)
 
+              | ScmSyntax { patterns :: ![(ScmValue, ScmValue)]
+                          , literals :: ![(String, Maybe ScmValue)] }
+
               -- These two are only for literal lists, appearing only directly
               -- from the parser
               | ScmList       ![ScmValue]
@@ -61,6 +65,14 @@ data ScmValue = ScmPrim       String !([ScmValue] -> Haschoo   ScmValue)
 
               -- The "unspecified value" returned by IO procedures and such
               | ScmVoid
+
+-- The form of the macro usage:
+--
+-- (macro foo bar), (macro foo . bar), or #(macro foo bar)
+--
+-- The macro keyword is not included regardless of constructor
+data MacroCall = MCList   ![ScmValue]
+               | MCDotted ![ScmValue] !ScmValue
 
 isTrue :: ScmValue -> Bool
 isTrue (ScmBool False) = False
@@ -109,6 +121,7 @@ scmShow ScmVoid           = return "" -- Has no representation
 scmShow (ScmBool b)       = return$ '#' : if b then "t" else "f"
 scmShow (ScmPrim s _)     = return s
 scmShow (ScmFunc s _)     = return s
+scmShow (ScmMacro s _)    = return s
 scmShow (ScmIdentifier s) = return s
 scmShow (ScmList xs)      = showScmList scmShow xs
 scmShow (ScmInt n)        = return$ show n
@@ -157,3 +170,5 @@ scmShow (ScmPair car cdr) = do
       (' ':) . (as ++) <$> (unsafeInterleaveIO $ readIORef y >>= go)
 
    go x = (" . "++) . (++")") <$> scmShow x
+
+scmShow (ScmSyntax _ _) = return "<syntax rules>"
