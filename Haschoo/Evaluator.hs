@@ -6,15 +6,15 @@ import           Control.Monad       (msum)
 import           Control.Monad.Error (throwError)
 import           Control.Monad.State (get)
 import           Control.Monad.Trans (liftIO)
-import           Data.IORef          (readIORef, modifyIORef)
+import           Data.IORef          (IORef, readIORef, modifyIORef)
 import qualified Data.IntMap as IM
 
-import Haschoo.Types           ( Haschoo
+import Haschoo.Types           ( Haschoo, runHaschoo
                                , ScmValue( ScmPrim, ScmFunc, ScmMacro
                                          , ScmList, ScmDottedList
                                          , ScmVoid, ScmIdentifier)
                                , MacroCall(..)
-                               , valMap, addToContext, contextLookup)
+                               , Context, valMap, addToContext, contextLookup)
 import Haschoo.Utils           (lazyMapM, modifyM)
 import Haschoo.Evaluator.Utils (tooFewArgs)
 
@@ -64,18 +64,26 @@ eval (ScmList (x:xs)) = do
                 Left  s   -> throwError s
                 Right val -> return val
 
-        ScmMacro _ f -> f (MCList xs) >>= eval
+        ScmMacro _ ctx f -> evalMacro ctx (f (MCList xs))
 
         _ -> throwError "Can't apply non-function"
 
 eval (ScmDottedList (x:xs) y) = do
    evaledHead <- eval x
    case evaledHead of
-        ScmMacro _ f -> f (MCDotted xs y) >>= eval
-        _            ->
-           throwError "Ill-formed procedure application: no dots allowed"
+        ScmMacro _ ctx f -> evalMacro ctx (f (MCDotted xs y))
+
+        _ -> throwError "Ill-formed procedure application: no dots allowed"
 
 eval v = return v
+
+evalMacro :: [IORef Context] -> Haschoo ScmValue -> Haschoo ScmValue
+evalMacro ctx f = do
+   expanded <- f
+   result   <- liftIO $ runHaschoo ctx (eval expanded)
+   case result of
+        Left  s   -> throwError s
+        Right val -> return val
 
 scmDefinition :: [ScmValue] -> Haschoo ()
 scmDefinition [ScmIdentifier var, expr] = define var expr

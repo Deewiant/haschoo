@@ -42,9 +42,10 @@ runHaschoo state (Haschoo h) = runErrorT $ evalStateT h state
 
 type HaschState = [IORef Context]
 
-data ScmValue = ScmPrim       String !([ScmValue] -> Haschoo   ScmValue)
-              | ScmMacro      String !(MacroCall  -> Haschoo ScmValue)
-              | ScmFunc       String !([ScmValue] -> IO (ErrOr ScmValue))
+data ScmValue = ScmPrim  String            !([ScmValue] -> Haschoo   ScmValue)
+              | ScmFunc  String            !([ScmValue] -> IO (ErrOr ScmValue))
+              | ScmMacro String !HaschState !(MacroCall -> Haschoo ScmValue)
+
               | ScmBool       !Bool
               | ScmChar       !Char
               | ScmString     !String
@@ -121,7 +122,7 @@ scmShow ScmVoid           = return "" -- Has no representation
 scmShow (ScmBool b)       = return$ '#' : if b then "t" else "f"
 scmShow (ScmPrim s _)     = return s
 scmShow (ScmFunc s _)     = return s
-scmShow (ScmMacro s _)    = return s
+scmShow (ScmMacro s _ _)  = return s
 scmShow (ScmIdentifier s) = return s
 scmShow (ScmList xs)      = showScmList scmShow xs
 scmShow (ScmInt n)        = return$ show n

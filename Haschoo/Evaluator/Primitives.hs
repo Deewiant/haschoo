@@ -194,31 +194,35 @@ scmSyntaxRules _  = throwError "Invalid list of literals to syntax-rules"
 
 scmLetSyntax :: [ScmValue] -> Haschoo ScmValue
 scmLetSyntax (ScmList bindings : body@(_:_)) = do
-   ctx    <- liftIO $ newIORef (mkContext [])
-   mapM_ (go ctx) bindings
    stack  <- get
+   ctx    <- liftIO $ newIORef (mkContext [])
+   mapM_ (go stack ctx) bindings
    result <- liftIO $ runHaschoo (ctx:stack) (evalBody body)
    case result of
         Left err -> throwError err
         Right v  -> return v
  where
-   go ctx (ScmList [ScmIdentifier var, binding]) = do
+   go stack ctx (ScmList [ScmIdentifier var, binding]) = do
       syntax <- eval binding
       case syntax of
            ScmSyntax pats lits ->
               liftIO $
-                 modifyIORef ctx (addToContext var $ mkMacro var pats lits)
+                 modifyIORef ctx
+                    (addToContext var $ mkMacro stack var pats lits)
 
            _ -> throwError "Invalid binding to let-syntax"
 
-   go _ _ = throwError "Invalid binding to let-syntax"
+   go _ _ _ = throwError "Invalid binding to let-syntax"
 
 scmLetSyntax (_:_:_) = throwError "Invalid list of bindings to let-syntax"
 scmLetSyntax _       = tooFewArgs "let-syntax"
 
-mkMacro :: String -> [(ScmValue, ScmValue)] -> [(String, Maybe ScmValue)]
+mkMacro :: [IORef Context]
+        -> String
+        -> [(ScmValue, ScmValue)]
+        -> [(String, Maybe ScmValue)]
         -> ScmValue
-mkMacro name pats lits = ScmMacro name f
+mkMacro ctxStack name pats lits = ScmMacro name ctxStack f
  where
    f args = do
       matching <- firstM (match args . fst) pats
