@@ -118,10 +118,9 @@ scmSet (_:_:_) = tooManyArgs "set!"
 scmSet _       = tooFewArgs  "set!"
 
 scmLetRec :: [ScmValue] -> Haschoo ScmValue
-scmLetRec (ScmList l : b) = doLetRec l b
-scmLetRec [_]             = tooFewArgs "letrec"
-scmLetRec []              = tooFewArgs "letrec"
-scmLetRec _               = throwError $ "Invalid list of bindings to letrec"
+scmLetRec (ScmList l : b@(_:_)) = doLetRec l b
+scmLetRec (_:_:_) = throwError "Invalid list of bindings to letrec"
+scmLetRec _       = tooFewArgs "letrec"
 
 doLetRec :: [ScmValue] -> [ScmValue] -> Haschoo ScmValue
 doLetRec bindings body = do
