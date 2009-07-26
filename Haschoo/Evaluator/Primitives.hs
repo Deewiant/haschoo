@@ -145,27 +145,37 @@ scmSyntaxRules (ScmList lits : rest) = do
    pats       <- mapM unpat rest
    return$ ScmSyntax pats evaledLits
  where
-   unpat (ScmList [pattern, template]) =
-      case pattern of
-           -- It really does seem to me that the keyword in a syntax rule is
-           -- ignored according to R5RS 4.3.2: what names the macro is the
-           -- identifier in define-syntax / let-syntax / letrec-syntax, the
-           -- name in the pattern match is irrelevant.
-           ScmList (ScmIdentifier _keyword : pat) -> do
-              let p = ScmList pat
-              checkPat p
-              return (p, template)
-            where
+   unpat (ScmList [pattern, template]) = do
+      pat <- case pattern of
+                  -- It really does seem to me that the keyword in a syntax
+                  -- rule is ignored according to R5RS 4.3.2: what names the
+                  -- macro is the identifier in define-syntax / let-syntax /
+                  -- letrec-syntax, the name in the pattern match is
+                  -- irrelevant.
+                  ScmList (ScmIdentifier _keyword : pat) ->
+                     return (ScmList pat)
+                  ScmDottedList (ScmIdentifier _keyword : pat) pat' ->
+                     return (ScmDottedList pat pat')
+                  -- TODO: vector
+                  _ -> badPattern
 
-           ScmDottedList (ScmIdentifier _keyword : pat) pat' -> do
-              let p = ScmDottedList pat pat'
-              checkPat p
-              return (p, template)
-
-           -- TODO: vector
-
-           _ -> badPattern
+      checkPat pat
+      return (pat, template, frees template)
     where
+      frees (ScmIdentifier i)    = if isLocal i
+                                      then []
+                                      else [i]
+      frees (ScmList       xs)   = concatMap frees xs
+      frees (ScmDottedList xs x) = frees x ++ concatMap frees xs
+      frees _                    = []
+
+      isLocal s = go pattern
+       where
+         go (ScmIdentifier i)    = s == i
+         go (ScmList xs)         = any go xs
+         go (ScmDottedList xs x) = any go xs || go x
+         go _                    = False
+
       checkPat p = do
          found <- go False p
          when (not found) (assertNoEllipses template)

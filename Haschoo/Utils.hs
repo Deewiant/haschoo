@@ -18,6 +18,9 @@ type ErrOr = Either String
 swap :: (a,b) -> (b,a)
 swap ~(a,b) = (b,a)
 
+fst3 :: (a,b,c) -> a
+fst3 (a,_,_) = a
+
 -- Returns the length of the shorter of the two
 compareLengths :: [a] -> [b] -> (Ordering, Int)
 compareLengths = go 0

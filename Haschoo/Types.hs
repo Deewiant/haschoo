@@ -46,9 +46,12 @@ withHaschoo state h = either fail return =<< liftIO (runHaschoo state h)
 
 type HaschState = [IORef Context]
 
-data ScmValue = ScmPrim  String            !([ScmValue] -> Haschoo   ScmValue)
-              | ScmFunc  String            !([ScmValue] -> IO (ErrOr ScmValue))
-              | ScmMacro String !HaschState !(MacroCall -> Haschoo   ScmValue)
+data ScmValue = ScmPrim  String !([ScmValue] -> Haschoo   ScmValue)
+              | ScmFunc  String !([ScmValue] -> IO (ErrOr ScmValue))
+
+              | ScmMacro String
+                   !(MacroCall ->
+                        Haschoo (ScmValue, TrieMap Char [IORef Context]))
 
               | ScmBool       !Bool
               | ScmChar       !Char
@@ -60,7 +63,7 @@ data ScmValue = ScmPrim  String            !([ScmValue] -> Haschoo   ScmValue)
               | ScmIdentifier !String
               | ScmPair       !(IORef ScmValue) !(IORef ScmValue)
 
-              | ScmSyntax { patterns :: ![(ScmValue, ScmValue)]
+              | ScmSyntax { patterns :: ![(ScmValue, ScmValue, [String])]
                           , literals :: ![(String, Maybe ScmValue)] }
 
               -- These two are only for literal lists, appearing only directly
@@ -126,7 +129,7 @@ scmShow ScmVoid           = return "" -- Has no representation
 scmShow (ScmBool b)       = return$ '#' : if b then "t" else "f"
 scmShow (ScmPrim s _)     = return s
 scmShow (ScmFunc s _)     = return s
-scmShow (ScmMacro s _ _)  = return s
+scmShow (ScmMacro s _)    = return s
 scmShow (ScmIdentifier s) = return s
 scmShow (ScmList xs)      = showScmList scmShow xs
 scmShow (ScmInt n)        = return$ show n

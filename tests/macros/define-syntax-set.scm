@@ -1,0 +1,5 @@
+(define x 1)
+(let-syntax ((m (syntax-rules () ((m) x))))
+  (set! x 2)
+  (write (if (= (m) 1) 'bad 'ok)))
+(newline)

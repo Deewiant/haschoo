@@ -22,7 +22,8 @@ import Haschoo.Types                          ( Haschoo
                                                    , ScmList, ScmDottedList)
                                               , MacroCall(..)
                                               , Context)
-import Haschoo.Utils                          (ptrEq, initLast2Maybe, eqWithM)
+import Haschoo.Utils                          ( fst3, initLast2Maybe
+                                              , ptrEq, eqWithM)
 import Haschoo.Evaluator.Eval                 (maybeEval)
 import Haschoo.Evaluator.Standard.Equivalence (scmEqual)
 
@@ -37,15 +38,19 @@ instance Monoid PatternMatches where
 
 type Lits = [(String, Maybe ScmValue)]
 
-mkMacro :: [IORef Context] -> String -> [(ScmValue, ScmValue)] -> Lits
-        -> ScmValue
-mkMacro ctxStack name pats ls = ScmMacro name ctxStack f
+mkMacro :: [IORef Context] -> String -> [(ScmValue, ScmValue, [String])]
+        -> Lits -> ScmValue
+mkMacro ctx name pats ls = ScmMacro name f
  where
    f args = do
-      (matching,replacements) <- runWriterT $ firstM (match ls args . fst) pats
+      (matching,replacements) <-
+         runWriterT $ firstM (match ls args . fst3) pats
+
       case matching of
-           Nothing    -> throwError ("Invalid use of macro " ++ name)
-           Just (_,v) -> return . simplifyList $ replaceVars replacements v
+           Nothing          -> throwError ("Invalid use of macro " ++ name)
+           Just (_,v,frees) ->
+              return ( simplifyList $ replaceVars replacements v
+                     , TM.fromList (zip frees (repeat ctx)))
 
 -- Turning MCDotted to ScmDottedList here means that the list in the
 -- ScmDottedList may actually be empty, which can't happen normally
