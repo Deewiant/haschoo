@@ -276,8 +276,8 @@ syntaxLet :: (IORef Context -> [IORef Context] -> [IORef Context]) -> String
           -> [ScmValue] -> Haschoo ScmValue
 
 syntaxLet f s (ScmList bindings : body@(_:_)) = do
-   ctx    <- liftIO $ newIORef (mkContext [])
-   stack  <- fmap (f ctx) get
+   ctx   <- liftIO $ newIORef (mkContext [])
+   stack <- fmap (f ctx) get
    mapM_ (go stack ctx) bindings
    withHaschoo (ctx:stack) (evalBody body)
  where
