@@ -14,6 +14,7 @@ import Control.Monad.Writer.Strict (WriterT, runWriterT, tell)
 import Data.IORef                  (IORef, newIORef, readIORef, modifyIORef)
 import Data.List                   (find)
 import Data.Maybe                  (isJust, isNothing)
+import Data.Monoid                 (Monoid(mempty, mappend))
 
 import qualified Data.ListTrie.Patricia.Map.Enum as TM
 import Data.ListTrie.Patricia.Map.Enum (TrieMap)
@@ -298,6 +299,14 @@ syntaxLet f s (ScmList bindings : body@(_:_)) = do
 syntaxLet _ s (_:_:_) = throwError ("Invalid list of bindings to " ++ s)
 syntaxLet _ s _       = tooFewArgs s
 
+-- The Left case is for ellipses
+newtype PatternMatches = PM (TrieMap Char (Either [ScmValue] ScmValue))
+
+-- Right-biased union instead of the default left-biased: so we can overwrite
+-- keys in a Writer with a second call to tell
+instance Monoid PatternMatches where
+   mempty                = PM mempty
+   mappend (PM a) (PM b) = PM (TM.union b a)
 
 mkMacro :: [IORef Context]
         -> String
@@ -310,10 +319,9 @@ mkMacro ctxStack name pats lits = ScmMacro name ctxStack f
       (matching, replacements) <- runWriterT $ firstM (match args . fst) pats
       case matching of
            Nothing    -> throwError ("Invalid use of macro " ++ name)
-           Just (_,v) -> return$ replaceVars replacements v
+           Just (_,v) -> return . simplifyList $ replaceVars replacements v
 
-   match :: MacroCall -> ScmValue
-         -> WriterT (TrieMap Char ScmValue) Haschoo Bool
+   match :: MacroCall -> ScmValue -> WriterT PatternMatches Haschoo Bool
 
    -- Turning MCDotted to ScmDottedList here means that the list in the
    -- ScmDottedList may actually be empty, which can't happen normally
@@ -323,13 +331,12 @@ mkMacro ctxStack name pats lits = ScmMacro name ctxStack f
    -- Paraphrasing R5RS 4.3.2:
    --
    -- "... formally, an input form F matches a pattern P iff:" ...
-   match1 :: ScmValue -> ScmValue
-          -> WriterT (TrieMap Char ScmValue) Haschoo Bool
-
+   match1 :: ScmValue -> ScmValue -> WriterT PatternMatches Haschoo Bool
    match1 arg (ScmIdentifier i) =
       case find ((== i).fst) lits of
            -- ... "P is a non-literal identifier" ...
-           Nothing           -> tell (TM.singleton i arg) >> return True
+           Nothing           -> do tell (PM $ TM.singleton i (Right arg))
+                                   return True
            Just (_, binding) ->
               case arg of
                    -- ... "P is a literal identifier and F is an identifier
@@ -351,7 +358,12 @@ mkMacro ctxStack name pats lits = ScmMacro name ctxStack f
            -- matches Pm" ...
            Just (ps', p, ScmIdentifier "...") ->
               let (xs, ys) = splitAt (length ps') args
-               in andM [allMatch xs ps', allM (\a -> match1 a p) ys]
+               in do m <- andM [allMatch xs ps', allM (flip match1 p) ys]
+                     case p of
+                          ScmIdentifier i ->
+                             tell (PM $ TM.singleton i (Left ys))
+                          _ -> return ()
+                     return m
 
            -- ... "P is a list (P1 ... Pn) and F is a list of n forms that
            -- match P1 through Pn" ...
@@ -375,15 +387,25 @@ mkMacro ctxStack name pats lits = ScmMacro name ctxStack f
 
    allMatch = eqWithM match1
 
-   replaceVars replacements v@(ScmIdentifier i)
-      | Just r <- TM.lookup i replacements = r
-      | otherwise                          = v
+   replaceVars :: PatternMatches -> ScmValue -> [ScmValue]
+   replaceVars (PM replacements) (ScmIdentifier i)
+      | Just r <- TM.lookup i replacements =
+         case r of
+              Right r' -> [r']
+              Left  rs -> rs
 
-   replaceVars rs (ScmList       l)   = ScmList       (map (replaceVars rs) l)
-   replaceVars rs (ScmDottedList l x) = ScmDottedList (map (replaceVars rs) l)
-                                                      (replaceVars rs x)
+      | i == "..." = []
 
-   replaceVars _ v = v
+   replaceVars rs (ScmList l) = [ScmList (concatMap (replaceVars rs) l)]
+
+   replaceVars rs (ScmDottedList l x) =
+      [ScmDottedList (concatMap (replaceVars rs) l)
+                     (simplifyList $ replaceVars rs x)]
+
+   replaceVars _ v = [v]
+
+   simplifyList [v] = v
+   simplifyList vs  = ScmList vs
 
 --- Utils
 
