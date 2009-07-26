@@ -6,7 +6,7 @@ module Haschoo.Running (RunError(..), runFile, runHandle, run) where
 
 import Control.Exception (Exception, throw)
 import Control.Monad     ((<=<), (>=>))
-import Data.IORef        (newIORef, readIORef)
+import Data.IORef        (IORef)
 import Data.Typeable     (Typeable)
 import System.IO         (Handle, openFile, IOMode(ReadMode), hGetContents)
 
@@ -25,19 +25,18 @@ instance Show RunError where
 
 instance Exception RunError
 
-runFile :: [Context] -> FilePath -> IO [Context]
+runFile :: [IORef Context] -> FilePath -> IO ()
 runFile ctx = runHandle ctx <=< flip openFile ReadMode
 
-runHandle :: [Context] -> Handle -> IO [Context]
+runHandle :: [IORef Context] -> Handle -> IO ()
 runHandle ctx = hGetContents >=> run ctx
 
-run :: [Context] -> String -> IO [Context]
+run :: [IORef Context] -> String -> IO ()
 run ctx str =
    case fst $ runParser program str of
         Left  e -> throw (ParseError e)
         Right p -> do
-           ctx'   <- mapM newIORef ctx
-           result <- evalToplevel ctx' p
+           result <- evalToplevel ctx p
            case result of
                 Left  e -> throw (RuntimeError e)
-                Right _ -> mapM readIORef ctx'
+                Right _ -> return ()

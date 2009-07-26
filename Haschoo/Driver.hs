@@ -2,7 +2,10 @@
 
 module Haschoo.Driver (main, runOne) where
 
-import Control.Exception  (handle)
+import Prelude hiding (catch)
+
+import Control.Exception  (catch)
+import Data.IORef         (newIORef, readIORef)
 import System.Environment (getArgs)
 import System.IO          (stdin)
 
@@ -12,12 +15,17 @@ import Haschoo.Utils   (void, errPrint)
 
 main :: IO ()
 main = do
-   ctx <- toplevelContext
+   ctx  <- toplevelContext
    args <- getArgs
    if null args
-      then void $ runHandle ctx stdin
-      else mapM_ (handle (\e -> errPrint (e :: RunError)) . void . runFile ctx)
-                  args
+      then runHandle ctx stdin
+      else do
+         initCtx <- mapM readIORef ctx
+         mapM_ (\f -> do
+                   ctx' <- mapM newIORef initCtx
+                   runFile ctx' f
+                      `catch` \e -> errPrint (e :: RunError))
+               args
 
 -- For GHCi use
 runOne :: String -> IO ()
