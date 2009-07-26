@@ -11,7 +11,7 @@ import Data.IORef          (IORef, newIORef, readIORef, modifyIORef)
 import Data.Maybe          (isJust)
 
 import Haschoo.Types            ( Haschoo, runHaschoo, withHaschoo
-                                , ScmValue(..), MacroCall(..), isTrue
+                                , ScmValue(..), isTrue
                                 , Context, mkContext, contextSize
                                 , addToContext, contextLookup)
 import Haschoo.Utils            (compareLength, compareLengths, (.:))
