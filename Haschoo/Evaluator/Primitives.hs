@@ -154,9 +154,7 @@ scmSyntaxRules (ScmList ls : rest) = do
            -- identifier in define-syntax / let-syntax / letrec-syntax, the
            -- name in the pattern match is irrelevant.
            ScmList (ScmIdentifier _keyword : pat) ->
-              case pat of
-                   [pat'] -> return (        pat', template)
-                   _      -> return (ScmList pat,  template)
+              return (ScmList pat, template)
 
            ScmDottedList (ScmIdentifier _keyword : pat) pat' ->
               return (ScmDottedList pat pat', template)
@@ -213,19 +211,26 @@ mkMacro ctxStack name pats lits = ScmMacro name ctxStack f
               -- TODO: replace pattern variables
               return v
 
+   match :: MacroCall -> ScmValue -> Haschoo Bool
+
+   -- Turning MCDotted to ScmDottedList here means that the list in the
+   -- ScmDottedList may actually be empty, which can't happen normally
+   match (MCList   xs)   = match1 (ScmList xs)
+   match (MCDotted xs x) = match1 (ScmDottedList xs x)
+
    -- Paraphrasing R5RS 4.3.2:
    --
    -- "... formally, an input form F matches a pattern P iff:" ...
-   match :: MacroCall -> ScmValue -> Haschoo Bool
-   match args (ScmIdentifier i) =
+   match1 :: ScmValue -> ScmValue -> Haschoo Bool
+   match1 arg (ScmIdentifier i) =
       case find ((== i).fst) lits of
            -- ... "P is a non-literal identifier" ...
            Nothing           -> return True
            Just (_, binding) ->
-              case args of
+              case arg of
                    -- ... "P is a literal identifier and F is an identifier
                    -- with the same binding" ...
-                   MCList [x@(ScmIdentifier _)] -> do
+                   x@(ScmIdentifier _) -> do
                       xb <- maybeEval x
                       case binding of
                            Nothing -> return (isNothing xb)
@@ -234,7 +239,7 @@ mkMacro ctxStack name pats lits = ScmMacro name ctxStack f
 
                    _  -> return False
 
-   match (MCList args) (ScmList ps) =
+   match1 (ScmList args) (ScmList ps) =
       case initLast2Maybe ps of
            -- ... "P is of the form (P1 ... Pn Pm <ellipsis>) where <ellipsis>
            -- is the identifier ... and F is a list of at least n forms, the
@@ -242,30 +247,31 @@ mkMacro ctxStack name pats lits = ScmMacro name ctxStack f
            -- matches Pm" ...
            Just (ps', p, ScmIdentifier "...") ->
               let (xs, ys) = splitAt (length ps') args
-               in andM [allMatch xs ps', allM (\a -> match (MCList [a]) p) ys]
+               in andM [allMatch xs ps', allM (\a -> match1 a p) ys]
 
            -- ... "P is a list (P1 ... Pn) and F is a list of n forms that
            -- match P1 through Pn" ...
            _ -> allMatch args ps
 
    -- ... "P is an improper list (P1 ... Pn . Pm)" ...
-   match args (ScmDottedList ps p) =
+   match1 args (ScmDottedList ps p) =
       case args of
            -- ... "and F is a list or improper list of n or more forms that
            -- match P1 through Pn and whose nth cdr matches Pm" ...
-           MCList   as -> let (xs, ys) = splitAt (length ps) as
-                           in andM [allMatch xs ps, match (MCList ys)  p]
-           MCDotted as a ->   andM [allMatch as ps, match (MCList [a]) p]
+           ScmList       as -> let (xs, ys) = splitAt (length ps) as
+                                in andM [allMatch xs ps, match (MCList ys) p]
+           ScmDottedList as a ->   andM [allMatch as ps, match1 a p]
+           _                  -> return False
 
    -- TODO: vectors
 
    -- ... "P is a datum and F is equal to P in the sense of the equal?
    -- procedure".
-   match (MCList [arg]) p = liftIO $ scmEqual arg p
+   match1 arg p = liftIO $ scmEqual arg p
 
-   match _ _ = return False
+   allMatch = eqWithM match1
 
-   allMatch = eqWithM (\a -> match (MCList [a]))
+
 
 --- Utils
 
