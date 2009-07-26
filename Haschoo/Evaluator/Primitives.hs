@@ -1,34 +1,23 @@
 -- File created: 2009-07-19 18:34:38
 
-{-# LANGUAGE PatternGuards #-}
-
 module Haschoo.Evaluator.Primitives (context) where
 
-import Control.Applicative         ((<$>))
-import Control.Monad               (when)
-import Control.Monad.Error         (throwError, catchError)
-import Control.Monad.Loops         (andM, allM, firstM)
-import Control.Monad.State         (get, put)
-import Control.Monad.Trans         (lift, liftIO)
-import Control.Monad.Writer.Strict (WriterT, runWriterT, tell)
-import Data.IORef                  (IORef, newIORef, readIORef, modifyIORef)
-import Data.List                   (find)
-import Data.Maybe                  (isJust, isNothing)
-import Data.Monoid                 (Monoid(mempty, mappend))
+import Control.Applicative ((<$>))
+import Control.Monad       (when)
+import Control.Monad.Error (throwError)
+import Control.Monad.State (get, put)
+import Control.Monad.Trans (liftIO)
+import Data.IORef          (IORef, newIORef, readIORef, modifyIORef)
+import Data.Maybe          (isJust)
 
-import qualified Data.ListTrie.Patricia.Map.Enum as TM
-import Data.ListTrie.Patricia.Map.Enum (TrieMap)
-
-import Haschoo.Types           ( Haschoo, runHaschoo, withHaschoo
-                               , ScmValue(..), MacroCall(..), isTrue
-                               , Context, mkContext, contextSize
-                               , addToContext, contextLookup)
-import Haschoo.Utils           ( compareLength, compareLengths, (.:)
-                               , initLast2Maybe, eqWithM, ptrEq)
-import Haschoo.Evaluator       (eval, evalBody)
-import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
-
-import Haschoo.Evaluator.Standard.Equivalence (scmEqual)
+import Haschoo.Types            ( Haschoo, runHaschoo, withHaschoo
+                                , ScmValue(..), MacroCall(..), isTrue
+                                , Context, mkContext, contextSize
+                                , addToContext, contextLookup)
+import Haschoo.Utils            (compareLength, compareLengths, (.:))
+import Haschoo.Evaluator.Eval   (eval, evalBody, maybeEval)
+import Haschoo.Evaluator.Macros (mkMacro)
+import Haschoo.Evaluator.Utils  (tooFewArgs, tooManyArgs)
 
 context :: Context
 context = mkContext primitives
@@ -298,116 +287,3 @@ syntaxLet f s (ScmList bindings : body@(_:_)) = do
 
 syntaxLet _ s (_:_:_) = throwError ("Invalid list of bindings to " ++ s)
 syntaxLet _ s _       = tooFewArgs s
-
--- The Left case is for ellipses
-newtype PatternMatches = PM (TrieMap Char (Either [ScmValue] ScmValue))
-
--- Right-biased union instead of the default left-biased: so we can overwrite
--- keys in a Writer with a second call to tell
-instance Monoid PatternMatches where
-   mempty                = PM mempty
-   mappend (PM a) (PM b) = PM (TM.union b a)
-
-mkMacro :: [IORef Context]
-        -> String
-        -> [(ScmValue, ScmValue)]
-        -> [(String, Maybe ScmValue)]
-        -> ScmValue
-mkMacro ctxStack name pats lits = ScmMacro name ctxStack f
- where
-   f args = do
-      (matching, replacements) <- runWriterT $ firstM (match args . fst) pats
-      case matching of
-           Nothing    -> throwError ("Invalid use of macro " ++ name)
-           Just (_,v) -> return . simplifyList $ replaceVars replacements v
-
-   match :: MacroCall -> ScmValue -> WriterT PatternMatches Haschoo Bool
-
-   -- Turning MCDotted to ScmDottedList here means that the list in the
-   -- ScmDottedList may actually be empty, which can't happen normally
-   match (MCList   xs)   = match1 (ScmList xs)
-   match (MCDotted xs x) = match1 (ScmDottedList xs x)
-
-   -- Paraphrasing R5RS 4.3.2:
-   --
-   -- "... formally, an input form F matches a pattern P iff:" ...
-   match1 :: ScmValue -> ScmValue -> WriterT PatternMatches Haschoo Bool
-   match1 arg (ScmIdentifier i) =
-      case find ((== i).fst) lits of
-           -- ... "P is a non-literal identifier" ...
-           Nothing           -> do tell (PM $ TM.singleton i (Right arg))
-                                   return True
-           Just (_, binding) ->
-              case arg of
-                   -- ... "P is a literal identifier and F is an identifier
-                   -- with the same binding" ...
-                   x@(ScmIdentifier _) -> do
-                      xb <- lift $ maybeEval x
-                      case binding of
-                           Nothing -> return (isNothing xb)
-                           Just pb ->
-                              maybe (return False) (liftIO . ptrEq pb) xb
-
-                   _  -> return False
-
-   match1 (ScmList args) (ScmList ps) =
-      case initLast2Maybe ps of
-           -- ... "P is of the form (P1 ... Pn Pm <ellipsis>) where <ellipsis>
-           -- is the identifier ... and F is a list of at least n forms, the
-           -- first n of which match P1 through Pn and each remaining element
-           -- matches Pm" ...
-           Just (ps', p, ScmIdentifier "...") ->
-              let (xs, ys) = splitAt (length ps') args
-               in do m <- andM [allMatch xs ps', allM (flip match1 p) ys]
-                     case p of
-                          ScmIdentifier i ->
-                             tell (PM $ TM.singleton i (Left ys))
-                          _ -> return ()
-                     return m
-
-           -- ... "P is a list (P1 ... Pn) and F is a list of n forms that
-           -- match P1 through Pn" ...
-           _ -> allMatch args ps
-
-   -- ... "P is an improper list (P1 ... Pn . Pm)" ...
-   match1 args (ScmDottedList ps p) =
-      case args of
-           -- ... "and F is a list or improper list of n or more forms that
-           -- match P1 through Pn and whose nth cdr matches Pm" ...
-           ScmList       as -> let (xs, ys) = splitAt (length ps) as
-                                in andM [allMatch xs ps, match1 (ScmList ys) p]
-           ScmDottedList as a ->   andM [allMatch as ps, match1 a p]
-           _                  -> return False
-
-   -- TODO: vectors
-
-   -- ... "P is a datum and F is equal to P in the sense of the equal?
-   -- procedure".
-   match1 arg p = liftIO $ scmEqual arg p
-
-   allMatch = eqWithM match1
-
-   replaceVars :: PatternMatches -> ScmValue -> [ScmValue]
-   replaceVars (PM replacements) (ScmIdentifier i)
-      | Just r <- TM.lookup i replacements =
-         case r of
-              Right r' -> [r']
-              Left  rs -> rs
-
-      | i == "..." = []
-
-   replaceVars rs (ScmList l) = [ScmList (concatMap (replaceVars rs) l)]
-
-   replaceVars rs (ScmDottedList l x) =
-      [ScmDottedList (concatMap (replaceVars rs) l)
-                     (simplifyList $ replaceVars rs x)]
-
-   replaceVars _ v = [v]
-
-   simplifyList [v] = v
-   simplifyList vs  = ScmList vs
-
---- Utils
-
-maybeEval :: ScmValue -> Haschoo (Maybe ScmValue)
-maybeEval = (`catchError` const (return Nothing)) . fmap Just . eval
