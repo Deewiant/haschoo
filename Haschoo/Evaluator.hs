@@ -4,12 +4,18 @@ module Haschoo.Evaluator (evalToplevel) where
 
 import Control.Monad.Error (throwError)
 import Control.Monad.State (get)
+import Data.IORef          (newIORef)
 
-import Haschoo.Types            ( Haschoo
-                                , ScmValue(ScmList, ScmIdentifier, ScmSyntax))
+import Haschoo.Types            ( Haschoo, runHaschoo
+                                , ScmValue(ScmList, ScmIdentifier, ScmSyntax)
+                                , Context)
+import Haschoo.Utils            (ErrOr)
 import Haschoo.Evaluator.Eval   (eval, evalBody, define)
 import Haschoo.Evaluator.Macros (mkMacro)
 import Haschoo.Evaluator.Utils  (tooFewArgs, tooManyArgs)
+
+import qualified Haschoo.Evaluator.Standard   as Standard
+import qualified Haschoo.Evaluator.Primitives as Primitives
 
 -- Programs consist of three things:
 --    expressions        - valid anywhere
@@ -24,11 +30,18 @@ import Haschoo.Evaluator.Utils  (tooFewArgs, tooManyArgs)
 -- hence definitions are handled separately in the former two instead of being
 -- ordinary primitives.
 
-evalToplevel :: [ScmValue] -> Haschoo ScmValue
-evalToplevel (ScmList (ScmIdentifier "define-syntax":xs) : ds) =
-   scmDefineSyntax xs >> evalToplevel ds
+evalToplevel :: [ScmValue] -> IO (ErrOr ScmValue)
+evalToplevel prog = do
+   ctx <- mapM newIORef toplevelContext
+   runHaschoo ctx (go prog)
+ where
+   go (ScmList (ScmIdentifier "define-syntax":xs) : ds) =
+      scmDefineSyntax xs >> go ds
 
-evalToplevel ds = fmap last . mapM (evalBody . return) $ ds
+   go ds = fmap last . mapM (evalBody . return) $ ds
+
+toplevelContext :: [Context]
+toplevelContext = [Standard.context, Primitives.context]
 
 scmDefineSyntax :: [ScmValue] -> Haschoo ()
 scmDefineSyntax [ScmIdentifier var, x] = do
