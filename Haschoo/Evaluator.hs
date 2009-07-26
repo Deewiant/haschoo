@@ -7,7 +7,8 @@ import Control.Monad.State (get)
 import Data.IORef          (newIORef)
 
 import Haschoo.Types            ( Haschoo, runHaschoo
-                                , ScmValue(ScmList, ScmIdentifier, ScmSyntax)
+                                , ScmValue( ScmList, ScmIdentifier, ScmSyntax
+                                          , ScmVoid)
                                 , Context)
 import Haschoo.Utils            (ErrOr)
 import Haschoo.Evaluator.Eval   (eval, evalBody, define)
@@ -33,12 +34,12 @@ import qualified Haschoo.Evaluator.Primitives as Primitives
 evalToplevel :: [ScmValue] -> IO (ErrOr ScmValue)
 evalToplevel prog = do
    ctx <- mapM newIORef toplevelContext
-   runHaschoo ctx (go prog)
+   runHaschoo ctx (fmap last $ mapM f prog)
  where
-   go (ScmList (ScmIdentifier "define-syntax":xs) : ds) =
-      scmDefineSyntax xs >> go ds
-
-   go ds = fmap last . mapM (evalBody . return) $ ds
+   f (ScmList (ScmIdentifier "define-syntax":xs)) = do
+      scmDefineSyntax xs
+      return ScmVoid
+   f d = evalBody [d]
 
 toplevelContext :: [Context]
 toplevelContext = [Standard.context, Primitives.context]
