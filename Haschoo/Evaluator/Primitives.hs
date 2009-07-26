@@ -149,10 +149,10 @@ doLetRec bindings body = do
    bind _  _ _ = throwError "Invalid binding to letrec"
 
 scmSyntaxRules :: [ScmValue] -> Haschoo ScmValue
-scmSyntaxRules (ScmList ls : rest) = do
-   lits <- mapM unlit ls
-   pats <- mapM unpat rest
-   return$ ScmSyntax pats lits
+scmSyntaxRules (ScmList lits : rest) = do
+   evaledLits <- mapM unlit lits
+   pats       <- mapM unpat rest
+   return$ ScmSyntax pats evaledLits
  where
    unpat (ScmList [pattern, template]) =
       case pattern of
@@ -276,7 +276,7 @@ mkMacro ctxStack name pats lits = ScmMacro name ctxStack f
            -- ... "and F is a list or improper list of n or more forms that
            -- match P1 through Pn and whose nth cdr matches Pm" ...
            ScmList       as -> let (xs, ys) = splitAt (length ps) as
-                                in andM [allMatch xs ps, match (MCList ys) p]
+                                in andM [allMatch xs ps, match1 (ScmList ys) p]
            ScmDottedList as a ->   andM [allMatch as ps, match1 a p]
            _                  -> return False
 
