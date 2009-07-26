@@ -1,15 +1,21 @@
 -- File created: 2009-07-19 18:34:38
 
+{-# LANGUAGE PatternGuards #-}
+
 module Haschoo.Evaluator.Primitives (context) where
 
-import Control.Applicative ((<$>))
-import Control.Monad.Error (throwError, catchError)
-import Control.Monad.Loops (andM, allM, firstM)
-import Control.Monad.State (get, put)
-import Control.Monad.Trans (liftIO)
-import Data.IORef          (IORef, newIORef, readIORef, modifyIORef)
-import Data.List           (find)
-import Data.Maybe          (isNothing)
+import Control.Applicative         ((<$>))
+import Control.Monad.Error         (throwError, catchError)
+import Control.Monad.Loops         (andM, allM, firstM)
+import Control.Monad.State         (get, put)
+import Control.Monad.Trans         (lift, liftIO)
+import Control.Monad.Writer.Strict (WriterT, runWriterT, tell)
+import Data.IORef                  (IORef, newIORef, readIORef, modifyIORef)
+import Data.List                   (find)
+import Data.Maybe                  (isNothing)
+
+import qualified Data.ListTrie.Patricia.Map.Enum as TM
+import Data.ListTrie.Patricia.Map.Enum (TrieMap)
 
 import Haschoo.Types           ( Haschoo, runHaschoo, withHaschoo
                                , ScmValue(..), MacroCall(..), isTrue
@@ -204,14 +210,13 @@ mkMacro :: [IORef Context]
 mkMacro ctxStack name pats lits = ScmMacro name ctxStack f
  where
    f args = do
-      matching <- firstM (match args . fst) pats
+      (matching, replacements) <- runWriterT $ firstM (match args . fst) pats
       case matching of
            Nothing    -> throwError ("Invalid use of macro " ++ name)
-           Just (_,v) -> do
-              -- TODO: replace pattern variables
-              return v
+           Just (_,v) -> return$ replaceVars replacements v
 
-   match :: MacroCall -> ScmValue -> Haschoo Bool
+   match :: MacroCall -> ScmValue
+         -> WriterT (TrieMap Char ScmValue) Haschoo Bool
 
    -- Turning MCDotted to ScmDottedList here means that the list in the
    -- ScmDottedList may actually be empty, which can't happen normally
@@ -221,17 +226,19 @@ mkMacro ctxStack name pats lits = ScmMacro name ctxStack f
    -- Paraphrasing R5RS 4.3.2:
    --
    -- "... formally, an input form F matches a pattern P iff:" ...
-   match1 :: ScmValue -> ScmValue -> Haschoo Bool
+   match1 :: ScmValue -> ScmValue
+          -> WriterT (TrieMap Char ScmValue) Haschoo Bool
+
    match1 arg (ScmIdentifier i) =
       case find ((== i).fst) lits of
            -- ... "P is a non-literal identifier" ...
-           Nothing           -> return True
+           Nothing           -> tell (TM.singleton i arg) >> return True
            Just (_, binding) ->
               case arg of
                    -- ... "P is a literal identifier and F is an identifier
                    -- with the same binding" ...
                    x@(ScmIdentifier _) -> do
-                      xb <- maybeEval x
+                      xb <- lift $ maybeEval x
                       case binding of
                            Nothing -> return (isNothing xb)
                            Just pb ->
@@ -271,7 +278,15 @@ mkMacro ctxStack name pats lits = ScmMacro name ctxStack f
 
    allMatch = eqWithM match1
 
+   replaceVars replacements v@(ScmIdentifier i)
+      | Just r <- TM.lookup i replacements = r
+      | otherwise                          = v
 
+   replaceVars rs (ScmList       l)   = ScmList       (map (replaceVars rs) l)
+   replaceVars rs (ScmDottedList l x) = ScmDottedList (map (replaceVars rs) l)
+                                                      (replaceVars rs x)
+
+   replaceVars _ v = v
 
 --- Utils
 
