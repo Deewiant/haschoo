@@ -5,6 +5,7 @@
 module Haschoo.Evaluator.Primitives (context) where
 
 import Control.Applicative         ((<$>))
+import Control.Monad               (when)
 import Control.Monad.Error         (throwError, catchError)
 import Control.Monad.Loops         (andM, allM, firstM)
 import Control.Monad.State         (get, put)
@@ -12,7 +13,7 @@ import Control.Monad.Trans         (lift, liftIO)
 import Control.Monad.Writer.Strict (WriterT, runWriterT, tell)
 import Data.IORef                  (IORef, newIORef, readIORef, modifyIORef)
 import Data.List                   (find)
-import Data.Maybe                  (isNothing)
+import Data.Maybe                  (isJust, isNothing)
 
 import qualified Data.ListTrie.Patricia.Map.Enum as TM
 import Data.ListTrie.Patricia.Map.Enum (TrieMap)
@@ -160,23 +161,109 @@ scmSyntaxRules (ScmList lits : rest) = do
            -- ignored according to R5RS 4.3.2: what names the macro is the
            -- identifier in define-syntax / let-syntax / letrec-syntax, the
            -- name in the pattern match is irrelevant.
-           ScmList (ScmIdentifier _keyword : pat) ->
-              return (ScmList pat, template)
+           ScmList (ScmIdentifier _keyword : pat) -> do
+              let p = ScmList pat
+              checkPat p
+              return (p, template)
+            where
 
-           ScmDottedList (ScmIdentifier _keyword : pat) pat' ->
-              return (ScmDottedList pat pat', template)
+           ScmDottedList (ScmIdentifier _keyword : pat) pat' -> do
+              let p = ScmDottedList pat pat'
+              checkPat p
+              return (p, template)
 
            -- TODO: vector
 
            _ -> badPattern
+    where
+      checkPat p = do
+         found <- go False p
+         when (not found) (assertNoEllipses template)
+       where
+         go found (ScmList ls) =
+            case findEllipsis ls of
+                 Just (_, after)
+                    | not (all elliptic after) ->
+                       srErr
+                          "Nonelliptic identifier follows ellipsis in pattern"
+
+                 Just (Nothing, _) ->
+                    srErr "Ellipsis not preceded by anything in pattern"
+
+                 Just (Just (ScmIdentifier i), after) -> do
+                    used <- checkEllipsisUse i (length after) template
+                    when (not used) $
+                       srErr . concat $
+                          [ "No matching ellipsis use for pattern variable '"
+                          , i, "'"]
+
+                    or <$> mapM (go True) ls
+
+                 Nothing -> or <$> mapM (go found) ls
+                 _       -> or <$> mapM (go True)  ls
+
+         go _ (ScmDottedList _ (ScmIdentifier "...")) =
+            srErr "Ellipsis terminating improper list"
+
+         go found (ScmDottedList ls x) = do
+            found' <- or <$> mapM (go found) ls
+            go found' x
+
+         -- TODO: vector
+
+         go found _ = return found
+
+      checkEllipsisUse = go False
+       where
+         go found var n (ScmList ls) =
+            case findEllipsis ls of
+                 Just (Just (ScmIdentifier i), after) | var == i ->
+
+                    if all elliptic (take n after)
+                       then or <$> mapM (go True var n) ls
+                       else srErr $ "Ellipsis use matches pattern variable " ++
+                                    "but not ellipsis count"
+
+                 _ -> or <$> mapM (go found var n) ls
+
+         go found var n (ScmDottedList ls x) = do
+            found' <- or <$> mapM (go found var n) ls
+            go found' var n x
+
+         -- TODO: vector
+
+         go found _ _ _ = return found
+
+      assertNoEllipses (ScmList ls) =
+         if isJust (findEllipsis ls)
+            then srErr "Ellipsis used as identifier in template"
+            else mapM_ assertNoEllipses ls
+
+      assertNoEllipses (ScmDottedList ls x) =
+         mapM_ assertNoEllipses ls >> assertNoEllipses x
+
+      assertNoEllipses _ = return ()
+
+      findEllipsis []                             = Nothing
+      findEllipsis (    ScmIdentifier "..." : xs) = Just (Nothing, xs)
+      findEllipsis (x : ScmIdentifier "..." : xs) = Just (Just x,  xs)
+      findEllipsis (_:xs)                         = findEllipsis xs
 
    unpat _ = badPattern
 
    badPattern = throwError "Invalid pattern in syntax-rules"
 
-   unlit lit@(ScmIdentifier i) = fmap ((,) i) (maybeEval lit)
+   unlit lit@(ScmIdentifier i) =
+      if elliptic lit
+         then throwError "Elliptic literal to syntax-rules"
+         else fmap ((,) i) (maybeEval lit)
 
    unlit _ = throwError "Nonidentifier literal to syntax-rules"
+
+   elliptic (ScmIdentifier "...") = True
+   elliptic _                     = False
+
+   srErr = throwError . (++ " in syntax-rules")
 
 scmSyntaxRules [] = tooFewArgs "syntax-rules"
 scmSyntaxRules _  = throwError "Invalid list of literals to syntax-rules"
