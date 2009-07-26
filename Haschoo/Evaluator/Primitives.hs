@@ -285,9 +285,12 @@ syntaxLet f s (ScmList bindings : body@(_:_)) = do
       syntax <- eval binding
       case syntax of
            ScmSyntax pats lits ->
-              liftIO $
-                 modifyIORef ctx
-                    (addToContext var $ mkMacro stack var pats lits)
+              let macro = mkMacro stack var (map addVar pats) lits
+               in liftIO $ modifyIORef ctx (addToContext var macro)
+            where
+              -- Add the macro's name to the list of free variables to create
+              -- the difference between let-syntax and letrec-syntax
+              addVar (pat, repl, frees) = (pat, repl, var:frees)
 
            _ -> badBinding s
 
