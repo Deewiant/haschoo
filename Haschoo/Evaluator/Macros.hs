@@ -65,11 +65,12 @@ match1 lits arg (ScmIdentifier i) =
         Just (_, binding) ->
            case arg of
                 -- ... "P is a literal identifier and F is an identifier with
-                -- the same binding" ...
-                x@(ScmIdentifier _) -> do
+                -- the same binding, or the two identifiers are equal and both
+                -- have no lexical binding" ...
+                x@(ScmIdentifier i2) -> do
                    xb <- lift $ maybeEval x
                    case binding of
-                        Nothing -> return (isNothing xb)
+                        Nothing -> return (isNothing xb && i == i2)
                         Just pb -> maybe (return False) (liftIO . ptrEq pb) xb
 
                 _  -> return False
