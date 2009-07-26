@@ -4,7 +4,7 @@ module Haschoo.Evaluator (evalToplevel) where
 
 import Control.Monad.Error (throwError)
 import Control.Monad.State (get)
-import Data.IORef          (newIORef)
+import Data.IORef          (IORef)
 
 import Haschoo.Types            ( Haschoo, runHaschoo
                                 , ScmValue( ScmList, ScmIdentifier, ScmSyntax
@@ -14,9 +14,6 @@ import Haschoo.Utils            (ErrOr)
 import Haschoo.Evaluator.Eval   (eval, evalBody, define)
 import Haschoo.Evaluator.Macros (mkMacro)
 import Haschoo.Evaluator.Utils  (tooFewArgs, tooManyArgs)
-
-import qualified Haschoo.Evaluator.Standard   as Standard
-import qualified Haschoo.Evaluator.Primitives as Primitives
 
 -- Programs consist of three things:
 --    expressions        - valid anywhere
@@ -31,18 +28,13 @@ import qualified Haschoo.Evaluator.Primitives as Primitives
 -- hence definitions are handled separately in the former two instead of being
 -- ordinary primitives.
 
-evalToplevel :: [ScmValue] -> IO (ErrOr ScmValue)
-evalToplevel prog = do
-   ctx <- mapM newIORef toplevelContext
-   runHaschoo ctx (fmap last $ mapM f prog)
+evalToplevel :: [IORef Context] -> [ScmValue] -> IO (ErrOr ScmValue)
+evalToplevel ctx prog = runHaschoo ctx (fmap last $ mapM f prog)
  where
    f (ScmList (ScmIdentifier "define-syntax":xs)) = do
       scmDefineSyntax xs
       return ScmVoid
    f d = evalBody [d]
-
-toplevelContext :: [Context]
-toplevelContext = [Standard.context, Primitives.context]
 
 scmDefineSyntax :: [ScmValue] -> Haschoo ()
 scmDefineSyntax [ScmIdentifier var, x] = do

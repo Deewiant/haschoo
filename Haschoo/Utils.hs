@@ -9,6 +9,7 @@ import Control.Monad.Error   () -- Monad ErrOr
 import Control.Monad.State   (MonadState, get, put)
 import Control.Monad.Trans   (MonadIO, liftIO)
 import Data.List             (intercalate)
+import System.IO             (hPutStr, hPutStrLn, stderr)
 import System.IO.Unsafe      (unsafeInterleaveIO)
 import System.Mem.StableName (makeStableName)
 
@@ -86,3 +87,12 @@ ptrEq x y = do
    nx <- makeStableName x
    ny <- makeStableName y
    return (nx == ny)
+
+errPut :: String -> IO ()
+errPut = hPutStr stderr
+
+errPutLn :: String -> IO ()
+errPutLn = hPutStrLn stderr
+
+errPrint :: Show a => a -> IO ()
+errPrint = errPutLn . show

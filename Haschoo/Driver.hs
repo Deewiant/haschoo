@@ -1,33 +1,24 @@
 -- File created: 2009-07-21 13:19:42
 
-module Haschoo.Driver (main) where
+module Haschoo.Driver (main, runOne) where
 
-import Control.Monad      ((<=<), (>=>))
+import Control.Exception  (handle)
 import System.Environment (getArgs)
-import System.IO          ( Handle, stdin, stderr, openFile, IOMode(ReadMode)
-                          , hGetContents, hPutStrLn)
+import System.IO          (stdin)
 
-import Text.ParserCombinators.Poly.Plain (runParser)
-
-import Haschoo.Evaluator (evalToplevel)
-import Haschoo.Parser    (program)
+import Haschoo.Running (runHandle, runFile, run, RunError)
+import Haschoo.Stdlib  (toplevelContext)
+import Haschoo.Utils   (void, errPrint)
 
 main :: IO ()
 main = do
+   ctx <- toplevelContext
    args <- getArgs
    if null args
-      then runHandle stdin
-      else mapM_ (runHandle <=< flip openFile ReadMode) args
+      then void $ runHandle ctx stdin
+      else mapM_ (handle (\e -> errPrint (e :: RunError)) . void . runFile ctx)
+                  args
 
-runHandle :: Handle -> IO ()
-runHandle = hGetContents >=> run
-
-run :: String -> IO ()
-run str =
-   case fst $ runParser program str of
-        Left  e -> hPutStrLn stderr $ "Parse error: " ++ e
-        Right p -> do
-           result <- evalToplevel p
-           case result of
-                Left  e -> hPutStrLn stderr $ "Runtime error: " ++ e
-                Right _ -> return ()
+-- For GHCi use
+runOne :: String -> IO ()
+runOne s = toplevelContext >>= void . flip run s
