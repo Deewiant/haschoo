@@ -33,13 +33,14 @@ context = mkContext primitives
 
 primitives :: [(String, ScmValue)]
 primitives = map (\(a,b) -> (a, ScmPrim a b)) $
-   [ ("lambda",       scmLambda)
-   , ("quote",        scmQuote)
-   , ("if",           scmIf)
-   , ("set!",         scmSet)
-   , ("letrec",       scmLetRec)
-   , ("syntax-rules", scmSyntaxRules)
-   , ("let-syntax",   scmLetSyntax) ]
+   [ ("lambda",         scmLambda)
+   , ("quote",          scmQuote)
+   , ("if",             scmIf)
+   , ("set!",           scmSet)
+   , ("letrec",         scmLetRec)
+   , ("syntax-rules",   scmSyntaxRules)
+   , ("let-syntax",     scmLetSyntax)
+   , ("letrec-syntax", scmLetRecSyntax) ]
 
 scmLambda :: [ScmValue] -> Haschoo ScmValue
 scmLambda []                                          = tooFewArgs "lambda"
@@ -180,10 +181,16 @@ scmSyntaxRules (ScmList ls : rest) = do
 scmSyntaxRules [] = tooFewArgs "syntax-rules"
 scmSyntaxRules _  = throwError "Invalid list of literals to syntax-rules"
 
-scmLetSyntax :: [ScmValue] -> Haschoo ScmValue
-scmLetSyntax (ScmList bindings : body@(_:_)) = do
-   stack  <- get
+scmLetSyntax, scmLetRecSyntax :: [ScmValue] -> Haschoo ScmValue
+scmLetSyntax    = syntaxLet (flip const) "let-syntax"
+scmLetRecSyntax = syntaxLet (:)          "letrec-syntax"
+
+syntaxLet :: (IORef Context -> [IORef Context] -> [IORef Context]) -> String
+          -> [ScmValue] -> Haschoo ScmValue
+
+syntaxLet f s (ScmList bindings : body@(_:_)) = do
    ctx    <- liftIO $ newIORef (mkContext [])
+   stack  <- fmap (f ctx) get
    mapM_ (go stack ctx) bindings
    withHaschoo (ctx:stack) (evalBody body)
  where
@@ -195,12 +202,15 @@ scmLetSyntax (ScmList bindings : body@(_:_)) = do
                  modifyIORef ctx
                     (addToContext var $ mkMacro stack var pats lits)
 
-           _ -> throwError "Invalid binding to let-syntax"
+           _ -> badBinding s
 
-   go _ _ _ = throwError "Invalid binding to let-syntax"
+   go _ _ _ = badBinding s
 
-scmLetSyntax (_:_:_) = throwError "Invalid list of bindings to let-syntax"
-scmLetSyntax _       = tooFewArgs "let-syntax"
+   badBinding = throwError . ("Invalid binding to " ++)
+
+syntaxLet _ s (_:_:_) = throwError ("Invalid list of bindings to " ++ s)
+syntaxLet _ s _       = tooFewArgs s
+
 
 mkMacro :: [IORef Context]
         -> String
