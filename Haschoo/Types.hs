@@ -48,7 +48,7 @@ type HaschState = [IORef Context]
 
 data ScmValue = ScmPrim  String            !([ScmValue] -> Haschoo   ScmValue)
               | ScmFunc  String            !([ScmValue] -> IO (ErrOr ScmValue))
-              | ScmMacro String !HaschState !(MacroCall -> Haschoo ScmValue)
+              | ScmMacro String !HaschState !(MacroCall -> Haschoo   ScmValue)
 
               | ScmBool       !Bool
               | ScmChar       !Char

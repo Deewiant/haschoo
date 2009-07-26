@@ -80,8 +80,6 @@ mkΛ formals tailParams body = ScmFunc name . func <$> get
          f (ScmIdentifier x) = Just x
          f _                 = Nothing
 
-   -- TODO: these should be cached somewhere somehow, not fully recreated every
-   -- time: we just need to substitute the parameter values
    name = "<lambda>"
    subContext = mkContext .: zip
 
@@ -231,7 +229,8 @@ mkMacro ctxStack name pats lits = ScmMacro name ctxStack f
                       xb <- maybeEval x
                       case binding of
                            Nothing -> return (isNothing xb)
-                           Just pb -> maybe (return False) (liftIO . ptrEq pb) xb
+                           Just pb ->
+                              maybe (return False) (liftIO . ptrEq pb) xb
 
                    _  -> return False
 
