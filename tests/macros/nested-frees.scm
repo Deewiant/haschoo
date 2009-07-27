@@ -1,0 +1,8 @@
+(define x 'ok)
+(let-syntax ((m1 (syntax-rules () ((m1) x))))
+  (define y 'ok)
+  (let ((x 'bad))
+    (let-syntax ((m2 (syntax-rules () ((m2) y))))
+      (let ((y 'bad))
+        (write (m1))(newline)
+        (write (m2))(newline)))))
