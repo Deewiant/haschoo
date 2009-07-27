@@ -7,7 +7,7 @@ import Haschoo.Utils           (ErrOr, showScmList)
 import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
 
 procedures :: [(String, ScmValue)]
-procedures = map (\(a,b) -> (a, ScmFunc a b)) $
+procedures = map (\(a,b) -> (a, ScmFunc a b))
    [ ("write",   scmWrite)
    , ("display", scmDisplay)
    , ("newline", scmNewline)

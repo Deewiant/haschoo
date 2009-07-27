@@ -11,7 +11,7 @@ import Haschoo.Evaluator.Utils            (tooFewArgs, tooManyArgs)
 import Haschoo.Evaluator.Standard.Numeric (isExact, isNumeric, numEq)
 
 procedures :: [(String, ScmValue)]
-procedures = map (\(a,b) -> (a, ScmFunc a b)) $
+procedures = map (\(a,b) -> (a, ScmFunc a b))
    [ "eq?"    $< id &&& fmap (fmap ScmBool) .: scmEquivalence scmEq
    , "eqv?"   $< id &&& fmap (fmap ScmBool) .: scmEquivalence scmEqv
    , "equal?" $< id &&& fmap (fmap ScmBool) .: scmEquivalence scmEqual
@@ -27,9 +27,7 @@ scmEqv   (ScmString       a)   (ScmString       b) = ptrEq a b
 scmEqv   (ScmFunc _       a)   (ScmFunc _       b) = ptrEq a b
 scmEqv   (ScmPrim _       a)   (ScmPrim _       b) = ptrEq a b
 scmEqv a b =
-   return $ if isNumeric a && isNumeric b
-               then isExact a == isExact b && numEq a b
-               else False
+   return $ isNumeric a && isNumeric b && isExact a == isExact b && numEq a b
 
 scmEq a b = if isNumeric a && isNumeric b
                then ptrEq  a b

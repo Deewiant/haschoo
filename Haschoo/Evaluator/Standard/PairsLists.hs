@@ -87,8 +87,8 @@ scmCdr s _                       = return$ tooManyArgs s
 --- set-car! set-cdr!
 
 scmSetCar, scmSetCdr :: [ScmValue] -> IO (ErrOr ScmValue)
-scmSetCar = scmSet (\a _ v -> writeIORef a v) "set-car!"
-scmSetCdr = scmSet (\_ b v -> writeIORef b v) "set-cdr!"
+scmSetCar = scmSet (const . writeIORef) "set-car!"
+scmSetCdr = scmSet (const   writeIORef) "set-cdr!"
 
 scmSet :: (IORef ScmValue -> IORef ScmValue -> ScmValue -> IO ()) -> String
        -> [ScmValue] -> IO (ErrOr ScmValue)

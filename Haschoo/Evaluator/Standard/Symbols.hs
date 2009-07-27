@@ -7,7 +7,7 @@ import Haschoo.Utils           (ErrOr)
 import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
 
 procedures :: [(String, ScmValue)]
-procedures = map (\(a,b) -> (a, ScmFunc a (return . b))) $
+procedures = map (\(a,b) -> (a, ScmFunc a (return . b)))
    [ ("symbol?",        fmap ScmBool . scmIsSymbol)
    , ("symbol->string", scmToString)
    , ("string->symbol", scmToSymbol)

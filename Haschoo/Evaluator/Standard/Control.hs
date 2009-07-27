@@ -12,7 +12,7 @@ import Haschoo.Utils           (ErrOr, initLast, (.:))
 import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs, notList)
 
 procedures :: [(String, ScmValue)]
-procedures = map (\(a,b) -> (a, ScmFunc a b)) $
+procedures = map (\(a,b) -> (a, ScmFunc a b))
    [ ("procedure?",  return . fmap ScmBool . scmIsProcedure)
    , ("apply",       scmApply)
    , ("map",         scmMap)
@@ -47,7 +47,7 @@ scmApply _     = return$ tooFewArgs   "apply"
 --- map for-each
 
 scmMap, scmForEach :: [ScmValue] -> IO (ErrOr ScmValue)
-scmMap (ScmFunc _ f : args@(_:_)) = do
+scmMap (ScmFunc _ f : args@(_:_)) =
    fmap (fmap ScmList) $ scmIterate "map" [] (:) f args
 
 scmMap (_:_) = return$ notProcedure "map"
@@ -86,7 +86,7 @@ scmIterate s end fuse f args = do
                       else return.Left $ s ++ " :: unmatching list lengths"
 
 prepArgs :: String -> [ScmValue] -> IO (ErrOr [[ScmValue]])
-prepArgs s = fmap (fmap transpose . sequence) .: mapM $ \a -> do
+prepArgs s = fmap (fmap transpose . sequence) .: mapM $ \a ->
       case a of
            ScmList xs       -> return.Right $ xs
            xs@(ScmPair _ _) -> do

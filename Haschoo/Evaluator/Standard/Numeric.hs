@@ -21,7 +21,7 @@ import           Haschoo.Utils           (ErrOr, allM, ($<), (.:))
 import           Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
 
 procedures :: [(String, ScmValue)]
-procedures = map (\(a,b) -> (a, ScmFunc a (return . b))) $
+procedures = map (\(a,b) -> (a, ScmFunc a (return . b)))
    [ ("number?",   fmap ScmBool . scmIsNumber)
    , ("complex?",  fmap ScmBool . scmIsNumber)
    , ("real?",     fmap ScmBool . scmIsReal)
@@ -612,9 +612,9 @@ pairScmReal :: ScmValue -> ScmValue -> ErrOr (ScmValue, ScmValue)
 pairScmReal (ScmComplex a) _ | imagPart a /= 0 = fail "pairScmReal :: complex"
 pairScmReal _ (ScmComplex b) | imagPart b /= 0 = fail "pairScmReal :: complex"
 
-pairScmReal a@(ScmInt     _) b@(ScmInt     _) = Right $ (a,b)
-pairScmReal a@(ScmRat     _) b@(ScmRat     _) = Right $ (a,b)
-pairScmReal a@(ScmReal    _) b@(ScmReal    _) = Right $ (a,b)
+pairScmReal a@(ScmInt     _) b@(ScmInt     _) = Right (a,b)
+pairScmReal a@(ScmRat     _) b@(ScmRat     _) = Right (a,b)
+pairScmReal a@(ScmReal    _) b@(ScmReal    _) = Right (a,b)
 pairScmReal   (ScmComplex a)   (ScmComplex b) =
    Right $ ((,) `on` ScmReal . realPart) a b
 
@@ -645,10 +645,10 @@ pairScmReal (ScmComplex a) (ScmReal    b) =
 pairScmReal _ _ = fail "pairScmReal :: internal error"
 
 pairScmComplex :: ScmValue -> ScmValue -> ErrOr (ScmValue, ScmValue)
-pairScmComplex a@(ScmInt     _) b@(ScmInt     _) = Right $ (a,b)
-pairScmComplex a@(ScmRat     _) b@(ScmRat     _) = Right $ (a,b)
-pairScmComplex a@(ScmReal    _) b@(ScmReal    _) = Right $ (a,b)
-pairScmComplex a@(ScmComplex _) b@(ScmComplex _) = Right $ (a,b)
+pairScmComplex a@(ScmInt     _) b@(ScmInt     _) = Right (a,b)
+pairScmComplex a@(ScmRat     _) b@(ScmRat     _) = Right (a,b)
+pairScmComplex a@(ScmReal    _) b@(ScmReal    _) = Right (a,b)
+pairScmComplex a@(ScmComplex _) b@(ScmComplex _) = Right (a,b)
 
 -- Int+{Rat,Real,Complex}
 pairScmComplex (ScmInt     a) (ScmRat     b) = Right$((,)`on`ScmRat) (fInt a) b

@@ -62,12 +62,12 @@ ident = do
       initial = ['a'..'z'] ++ ['A'..'Z'] ++ "!$%&*/:<=>?^_~"
 
 bool :: Parser Char ScmValue
-bool = one '#' >> ScmBool . (== 't') <$> (pElem "ft")
+bool = one '#' >> ScmBool . (== 't') <$> pElem "ft"
 
 character :: Parser Char ScmValue
 character = do
    string "#\\"
-   c <- oneOf [named, (ScmChar) <$> next]
+   c <- oneOf [named, ScmChar <$> next]
    commit delimiter `usingError` "Invalid named character"
    return c
  where
@@ -195,41 +195,39 @@ number defRadix = do
    mkRatio _          _          = error "number.mkRatio :: internal error"
 
    decimal radix | radix /= 10 = fail "Decimal outside radix 10"
-                 | otherwise   = do
-      n <- oneOf [ do one '.'
-                      n <- many1 (digit 10)
-                      many (one '#')
-                      return . ScmReal $ readPostDecimal n
+                 | otherwise   =
+      tryExponent =<< oneOf [ do one '.'
+                                 n <- many1 (digit 10)
+                                 many (one '#')
+                                 return . ScmReal $ readPostDecimal n
 
-                 , do a <- many1 (digit 10)
-                      one '.'
-                      b <- many (digit 10)
-                      many (one '#')
-                      return . ScmReal $ readDecimal a b
+                            , do a <- many1 (digit 10)
+                                 one '.'
+                                 b <- many (digit 10)
+                                 many (one '#')
+                                 return . ScmReal $ readDecimal a b
 
-                 , do n <- many1 (digit 10)
-                      hashes <- many1 (one '#')
-                      one '.'
-                      hashes2 <- many (one '#')
-                      return . inexactHashes (hashes ++ hashes2) . ScmInt $
-                         readInteger 10 (n ++ map (const '0') hashes)
-                 ]
-      tryExponent n
+                            , do n <- many1 (digit 10)
+                                 hashes  <- map (const '0') <$> many1 (one '#')
+                                 one '.'
+                                 hashes2 <- many (one '#')
+                                 return . inexactHashes (hashes ++ hashes2) .
+                                    ScmInt $ readInteger 10 (n ++ hashes)
+                            ]
 
    tryExponent n = do
       ex <- optional $ do pElem "esfdlESFDL" -- Ignore the exponent: all Double
                           neg <- optional sign
                           xs  <- many1 (digit 10)
-                          return$ (fromMaybe 1 neg) * readInteger 10 xs
+                          return$ fromMaybe 1 neg * readInteger 10 xs
       return$ case ex of
                    Nothing -> n
                    Just e  -> ScmReal (10^^e * toDouble n)
 
    uint radix = do
       n <- many1 (digit radix)
-      hashes <- many (one '#')
-      return . inexactHashes hashes . ScmInt $
-         readInteger radix (n ++ map (const '0') hashes)
+      hashes <- map (const '0') <$> many (one '#')
+      return . inexactHashes hashes . ScmInt $ readInteger radix (n ++ hashes)
 
    -- If any # were present, the value is inexact (R5RS 6.2.4)
    inexactHashes :: String -> ScmValue -> ScmValue
@@ -253,7 +251,7 @@ number defRadix = do
 
    readPostDecimal :: String -> Double
    readPostDecimal [] = 0
-   readPostDecimal xs = fromInteger (readInteger 10 xs) / (10 ^ (length xs))
+   readPostDecimal xs = fromInteger (readInteger 10 xs) / (10 ^ length xs)
 
    readDecimal :: String -> String -> Double
    readDecimal as bs = fromInteger (readInteger 10 as) + readPostDecimal bs
