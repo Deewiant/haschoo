@@ -7,17 +7,22 @@ import Control.Monad       (when)
 import Control.Monad.Error (throwError)
 import Control.Monad.State (get, put)
 import Control.Monad.Trans (liftIO)
-import Data.IORef          (IORef, newIORef, readIORef, modifyIORef)
+import Data.IORef          ( IORef, readIORef
+                           , newIORef, modifyIORef, writeIORef)
 import Data.Maybe          (isJust)
 
 import Haschoo.Types            ( Haschoo, runHaschoo, withHaschoo
                                 , ScmValue(..), isTrue
                                 , Context, mkContext, contextSize
-                                , addToContext, contextLookup)
-import Haschoo.Utils            (compareLength, compareLengths, (.:))
+                                , addToContext, contextLookup
+                                , listToPair)
+import Haschoo.Utils            ( compareLength, compareLengths, (.:)
+                                , fromRights)
 import Haschoo.Evaluator.Eval   (eval, evalBody, maybeEval)
 import Haschoo.Evaluator.Macros (mkMacro)
 import Haschoo.Evaluator.Utils  (tooFewArgs, tooManyArgs)
+
+import Haschoo.Evaluator.Standard.PairsLists (scmAppend)
 
 context :: Context
 context = mkContext primitives
@@ -31,7 +36,8 @@ primitives = map (\(a,b) -> (a, ScmPrim a b)) $
    , ("letrec",        scmLetRec)
    , ("syntax-rules",  scmSyntaxRules)
    , ("let-syntax",    scmLetSyntax)
-   , ("letrec-syntax", scmLetRecSyntax) ]
+   , ("letrec-syntax", scmLetRecSyntax)
+   , ("quasiquote",    scmQuasiQuote) ]
 
 scmLambda :: [ScmValue] -> Haschoo ScmValue
 scmLambda []                                          = tooFewArgs "lambda"
@@ -300,3 +306,100 @@ syntaxLet f s (ScmList bindings : body@(_:_)) = do
 
 syntaxLet _ s (_:_:_) = throwError ("Invalid list of bindings to " ++ s)
 syntaxLet _ s _       = tooFewArgs s
+
+scmQuasiQuote :: [ScmValue] -> Haschoo ScmValue
+scmQuasiQuote [expr] = finishUnqq <$> unqq 0 expr
+ where
+   finishUnqq = either (either (uncurry ScmPair) ScmList) id
+
+   finishWrapUnqq s v = Right $ ScmList [ScmIdentifier s, finishUnqq v]
+
+   -- Left results are stuff that need to be spliced
+   unqq :: Int
+        -> ScmValue
+        -> Haschoo (Either (Either (IORef ScmValue, IORef ScmValue) [ScmValue])
+                           ScmValue)
+
+   unqq n (ScmList (ScmIdentifier s@"unquote" : vs)) =
+      case vs of
+           [v] | n == 0    -> Right <$> eval v
+               | otherwise -> finishWrapUnqq s <$> unqq (n-1) v
+           [] -> tooFewArgs  s
+           _  -> tooManyArgs s
+
+   unqq n (ScmList (ScmIdentifier s@"unquote-splicing" : vs)) =
+      case vs of
+           [v] | n == 0 -> do
+              ev <- eval v
+              case ev of
+                   ScmList evs -> return$ Left . Right $ evs
+                   ScmPair a b -> return$ Left . Left  $ (a,b)
+                   _           -> notList
+
+               | otherwise -> unqq (n-1) v
+
+           [] -> tooFewArgs  s
+           _  -> tooManyArgs s
+
+   unqq n (ScmList (ScmIdentifier s@"quasiquote" : vs)) =
+      case vs of
+         [v] -> finishWrapUnqq s <$> unqq (n+1) v
+         []  -> tooFewArgs  s
+         _   -> tooManyArgs s
+
+   unqq n (ScmList xs) =
+      Right . either (uncurry ScmPair) ScmList <$>
+         (splice =<< mapM (unqq n) xs)
+
+   unqq n (ScmDottedList xs x) = do
+      xs' <- splice =<< mapM (unqq n) xs
+      x'  <- unqq n x
+      case x' of
+           Left _  -> throwError "quasiquote :: unexpected unquote-splicing"
+           Right v ->
+              case xs' of
+                   Left (a,b) -> Right <$> (liftIO $ snocPair (ScmPair a b) v)
+                   Right ys   -> return$ Right $ ScmDottedList ys v
+
+   unqq _ x = return (Right x)
+
+   splice :: [Either (Either (IORef ScmValue, IORef ScmValue) [ScmValue])
+                     ScmValue]
+          -> Haschoo (Either (IORef ScmValue, IORef ScmValue) [ScmValue])
+   splice xs =
+      case fromRights xs of
+           Just xs' -> return$ Right xs'
+           Nothing  ->
+              let listified = map (either id (Right . (:[]))) xs
+               in case fromRights listified of
+                       Just xs' -> return$ Right (concat xs')
+                       Nothing  -> do
+                          cat <- liftIO $
+                             scmAppend =<<
+                                mapM (either (return . uncurry ScmPair)
+                                             (fmap fst . listToPair))
+                                     listified
+                          case cat of
+                               Left  _             -> notList
+                               Right (ScmPair a b) -> return$ Left (a,b)
+                               Right _             ->
+                                  error "splice :: the impossible happened"
+
+   snocPair :: ScmValue -> ScmValue -> IO ScmValue
+   snocPair p@(ScmPair _ b) x = do
+      b' <- liftIO $ readIORef b
+      case b' of
+           ScmList xs      -> do liftIO $ writeIORef b (ScmList (xs ++ [x]))
+                                 return p
+           q@(ScmPair _ _) -> snocPair q x
+
+           -- splice's return value should be a proper list
+           _               -> error "snocPair :: the impossible happened"
+
+   snocPair _ _ = error "snocPair :: the impossible happened"
+
+   notList :: Haschoo a
+   notList = throwError "quasiquote :: unquote-splicing did not return a list"
+
+scmQuasiQuote [] = tooFewArgs  "quasiquote"
+scmQuasiQuote _  = tooManyArgs "quasiquote"

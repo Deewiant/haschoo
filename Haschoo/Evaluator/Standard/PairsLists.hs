@@ -1,6 +1,6 @@
 -- File created: 2009-07-21 22:13:29
 
-module Haschoo.Evaluator.Standard.PairsLists (procedures) where
+module Haschoo.Evaluator.Standard.PairsLists (procedures, scmAppend) where
 
 import Control.Applicative ((<$>))
 import Control.Arrow       ((&&&))

@@ -47,6 +47,11 @@ initLast2Maybe [x,y]  = Just ([], x, y)
 initLast2Maybe (a:as) = fmap (\ ~(bs,x,y) -> (a:bs,x,y)) (initLast2Maybe as)
 initLast2Maybe []     = Nothing
 
+fromRights :: [Either a b] -> Maybe [b]
+fromRights []             = Just []
+fromRights (Left _ : _)   = Nothing
+fromRights (Right x : xs) = fmap (x:) (fromRights xs)
+
 -- eqWithM p xs ys is kind of like allM (uncurry p) (zip xs ys) but takes into
 -- account the lengths of the lists (differing lengths aren't equal)
 --
