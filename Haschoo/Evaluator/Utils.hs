@@ -9,5 +9,4 @@ import Control.Monad.Error (MonadError, throwError)
 tooFewArgs, tooManyArgs, notList :: MonadError String m => String -> m a
 tooFewArgs  = throwError . ("Too few arguments to " ++)
 tooManyArgs = throwError . ("Too many arguments to " ++)
-
-notList = throwError . ("Nonlist argument to "++)
+notList     = throwError . ("Nonlist argument to "++)

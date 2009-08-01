@@ -24,13 +24,13 @@ context = mkContext primitives
 
 primitives :: [(String, ScmValue)]
 primitives = map (\(a,b) -> (a, ScmPrim a b)) $
-   [ ("lambda",         scmLambda)
-   , ("quote",          scmQuote)
-   , ("if",             scmIf)
-   , ("set!",           scmSet)
-   , ("letrec",         scmLetRec)
-   , ("syntax-rules",   scmSyntaxRules)
-   , ("let-syntax",     scmLetSyntax)
+   [ ("lambda",        scmLambda)
+   , ("quote",         scmQuote)
+   , ("if",            scmIf)
+   , ("set!",          scmSet)
+   , ("letrec",        scmLetRec)
+   , ("syntax-rules",  scmSyntaxRules)
+   , ("let-syntax",    scmLetSyntax)
    , ("letrec-syntax", scmLetRecSyntax) ]
 
 scmLambda :: [ScmValue] -> Haschoo ScmValue

@@ -224,7 +224,7 @@ scmAppend args@(_:_) = foldrM fold (Left "") args
    go rhs x@(ScmList _)   = f x rhs
    go _   _               = return$ notList "append"
 
-scmAppend [] = return$ tooFewArgs  "append"
+scmAppend [] = return$ tooFewArgs "append"
 
 --- reverse
 
