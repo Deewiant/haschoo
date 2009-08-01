@@ -51,6 +51,8 @@ procedures = map (\(a,b) -> (a, ScmFunc a (return . b)))
    , ("*", scmMul)
    , ("/", scmDiv)
 
+   , ("abs", scmAbs)
+
    , ("quotient",  scmQuot)
    , ("remainder", scmRem)
    , ("modulo",    scmMod)
@@ -221,6 +223,16 @@ scmDiv (x:xs) =
 
    unint (ScmInt n) = Right $ ScmRat (fromInteger n)
    unint n          = if isNumeric x then Right n else notNum "/"
+
+---- abs
+
+scmAbs :: [ScmValue] -> ErrOr ScmValue
+scmAbs [x] =
+   if isNumeric x
+      then liftScmNum abs x
+      else notNum "abs"
+scmAbs [] = tooFewArgs  "abs"
+scmAbs _  = tooManyArgs "abs"
 
 ---- quot rem mod
 
