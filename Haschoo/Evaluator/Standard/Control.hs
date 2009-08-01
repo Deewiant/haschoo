@@ -47,8 +47,11 @@ scmApply _     = return$ tooFewArgs   "apply"
 --- map for-each
 
 scmMap, scmForEach :: [ScmValue] -> IO (ErrOr ScmValue)
-scmMap (ScmFunc _ f : args@(_:_)) =
-   fmap (fmap ScmList) $ scmIterate "map" [] (:) f args
+scmMap (ScmFunc _ f : args@(_:_)) = do
+   l <- scmIterate "map" [] (:) f args
+   case l of
+        Left  s  -> return (Left s)
+        Right xs -> fmap (Right . fst) (listToPair xs)
 
 scmMap (_:_) = return$ notProcedure "map"
 scmMap _     = return$ tooFewArgs   "map"
