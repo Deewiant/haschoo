@@ -3,7 +3,7 @@
 module Haschoo.Evaluator.Standard.PairsLists (procedures) where
 
 import Control.Applicative ((<$>))
-import Control.Arrow       ((&&&), second)
+import Control.Arrow       ((&&&))
 import Control.Monad       (join, replicateM, (>=>))
 import Control.Monad.Loops (dropWhileM, firstM)
 import Data.Foldable       (foldrM)
@@ -11,7 +11,8 @@ import Data.IORef          (IORef, newIORef, readIORef, writeIORef)
 import Data.List           (genericDrop)
 import Data.Maybe          (fromMaybe)
 
-import Haschoo.Types                          (ScmValue(..), pairToList)
+import Haschoo.Types                          ( ScmValue(..)
+                                              , pairToList, listToPair)
 import Haschoo.Utils                          (ErrOr, ($<), ptrEq)
 import Haschoo.Evaluator.Utils                (tooFewArgs,tooManyArgs, notList)
 import Haschoo.Evaluator.Standard.Equivalence (scmEq, scmEqv, scmEqual)
@@ -199,7 +200,7 @@ scmAppend args@(_:_) = foldrM fold (Left "") args
 
    f (p@(ScmPair _ _)) rhs = next rhs p
    f (ScmList xs)      rhs = do
-      (xs', fin) <- pairify xs
+      (xs', fin) <- listToPair xs
       case fin of
            Nothing -> return . Right $ rhs
            Just p  -> do
@@ -229,11 +230,11 @@ scmAppend [] = return$ tooFewArgs "append"
 --- reverse
 
 scmReverse :: [ScmValue] -> IO (ErrOr ScmValue)
-scmReverse [ScmList xs]      = fmap (Right . fst) . pairify $ reverse xs
+scmReverse [ScmList xs]      = fmap (Right . fst) . listToPair $ reverse xs
 scmReverse [x@(ScmPair _ _)] = do
    x' <- pairToList x
    case x' of
-        Right (ScmList l) -> fmap (Right . fst) . pairify $ reverse l
+        Right (ScmList l) -> fmap (Right . fst) . listToPair $ reverse l
         Left _            -> return $ notList "reverse"
         Right _           -> error "reverse :: the impossible happened"
 scmReverse [_]               = return$ notList     "reverse"
@@ -328,20 +329,3 @@ scmLookup _ s _       = return$ tooFewArgs  s
 immutable, notPair :: String -> ErrOr a
 immutable = fail . ("Immutable argument to " ++)
 notPair   = fail . ("Nonpair argument to " ++)
-
--- ScmList -> ScmPair, returns the tail pointer if it wasn't empty
-pairify :: [ScmValue] -> IO (ScmValue, Maybe (IORef ScmValue))
-pairify []     = return (ScmList [], Nothing)
-pairify (x:xs) = second Just <$> go x xs
- where
-   go :: ScmValue -> [ScmValue] -> IO (ScmValue, IORef ScmValue)
-   go v [] = do
-      a <- newIORef v
-      b <- newIORef (ScmList [])
-      return (ScmPair a b, b)
-
-   go v (y:ys) = do
-      a         <- newIORef v
-      (zs, fin) <- go y ys
-      b         <- newIORef zs
-      return (ScmPair a b, fin)

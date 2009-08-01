@@ -7,7 +7,7 @@ module Haschoo.Evaluator.Standard.Control (procedures) where
 import Data.List           (transpose, genericLength)
 import Data.Number.Natural (Natural)
 
-import Haschoo.Types           (ScmValue(..), pairToList)
+import Haschoo.Types           (ScmValue(..), pairToList, listToPair)
 import Haschoo.Utils           (ErrOr, initLast, (.:))
 import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs, notList)
 

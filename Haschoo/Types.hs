@@ -9,18 +9,19 @@
 
 module Haschoo.Types
    ( Haschoo, runHaschoo, withHaschoo
-   , ScmValue(..), MacroCall(..), isTrue, pairToList
+   , ScmValue(..), MacroCall(..), isTrue, pairToList, listToPair
    , Context(..), mkContext, addToContext, contextLookup, contextSize
    , scmShow
    ) where
 
 import Control.Applicative             ((<$>))
+import Control.Arrow                   (second)
 import Control.Monad                   (liftM2)
 import Control.Monad.Error             (ErrorT, MonadError, runErrorT)
 import Control.Monad.State.Strict      (StateT, MonadState, evalStateT)
 import Control.Monad.Trans             (MonadIO, liftIO)
 import Data.Complex                    (Complex((:+)))
-import Data.IORef                      (IORef, readIORef)
+import Data.IORef                      (IORef, readIORef, newIORef)
 import Data.IntMap                     (IntMap)
 import Data.ListTrie.Patricia.Map.Enum (TrieMap)
 import Data.Maybe                      (fromMaybe)
@@ -101,6 +102,23 @@ pairToList = go []
       go (a':xs) b'
 
    go xs v = return . Left $ ScmDottedList (reverse xs) v
+
+-- ScmList -> ScmPair, returns the tail pointer if it wasn't empty
+listToPair :: [ScmValue] -> IO (ScmValue, Maybe (IORef ScmValue))
+listToPair []     = return (ScmList [], Nothing)
+listToPair (x:xs) = second Just <$> go x xs
+ where
+   go :: ScmValue -> [ScmValue] -> IO (ScmValue, IORef ScmValue)
+   go v [] = do
+      a <- newIORef v
+      b <- newIORef (ScmList [])
+      return (ScmPair a b, b)
+
+   go v (y:ys) = do
+      a         <- newIORef v
+      (zs, fin) <- go y ys
+      b         <- newIORef zs
+      return (ScmPair a b, fin)
 
 data Context = Context { idMap  :: TrieMap Char Int
                        , valMap :: IntMap ScmValue }
