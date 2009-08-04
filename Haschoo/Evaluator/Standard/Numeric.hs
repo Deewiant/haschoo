@@ -18,7 +18,7 @@ import Text.ParserCombinators.Poly.Plain (runParser)
 import qualified Haschoo.Parser as Parser
 import           Haschoo.Types           (ScmValue(..))
 import           Haschoo.Utils           (ErrOr, allM, ($<), (.:))
-import           Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
+import           Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs, notInt)
 
 procedures :: [(String, ScmValue)]
 procedures = map (\(a,b) -> (a, ScmFunc a (return . b)))
@@ -486,8 +486,7 @@ scmToNumber _  = fail "Nonstring argument to string->number"
 
 -------------
 
-notInt, notNum, notReal, notRat :: String -> ErrOr a
-notInt  = fail . ("Noninteger argument to " ++)
+notNum, notReal, notRat :: String -> ErrOr a
 notNum  = fail . ("Nonnumeric argument to " ++)
 notReal = fail . ("Nonreal argument to " ++)
 notRat  = fail . ("Nonrational argument to " ++)

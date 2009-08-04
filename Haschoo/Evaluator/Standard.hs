@@ -4,6 +4,7 @@ module Haschoo.Evaluator.Standard (context) where
 
 import           Haschoo.Types (ScmValue, Context, mkContext)
 import qualified Haschoo.Evaluator.Standard.Boolean     as Boolean
+import qualified Haschoo.Evaluator.Standard.Characters  as Characters
 import qualified Haschoo.Evaluator.Standard.Control     as Control
 import qualified Haschoo.Evaluator.Standard.Equivalence as Equivalence
 import qualified Haschoo.Evaluator.Standard.IO          as IO
@@ -13,6 +14,7 @@ import qualified Haschoo.Evaluator.Standard.Symbols     as Symbols
 
 procedures :: [(String, ScmValue)]
 procedures = concat [ Boolean.procedures
+                    , Characters.procedures
                     , Control.procedures
                     , Equivalence.procedures
                     , IO.procedures
