@@ -482,16 +482,15 @@ scmToNumber (ScmString s : xs) =
                _                     -> ScmBool False
 
 scmToNumber [] = tooFewArgs "string->number"
-scmToNumber _  =
-   fail "Nonstring argument to primitive procedure string->number"
+scmToNumber _  = fail "Nonstring argument to string->number"
 
 -------------
 
 notInt, notNum, notReal, notRat :: String -> ErrOr a
-notInt  = fail . ("Noninteger argument to primitive procedure " ++)
-notNum  = fail . ("Nonnumeric argument to primitive procedure " ++)
-notReal = fail . ("Nonreal argument to primitive procedure " ++)
-notRat  = fail . ("Nonrational argument to primitive procedure " ++)
+notInt  = fail . ("Noninteger argument to " ++)
+notNum  = fail . ("Nonnumeric argument to " ++)
+notReal = fail . ("Nonreal argument to " ++)
+notRat  = fail . ("Nonrational argument to " ++)
 
 isNumeric, isInteger :: ScmValue -> Bool
 isNumeric (ScmInt     _) = True
