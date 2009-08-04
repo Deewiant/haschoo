@@ -2,6 +2,9 @@
 
 module Haschoo.Evaluator.Standard.IO (procedures) where
 
+import Data.Array.IArray (elems)
+import Data.Array.MArray (getElems)
+
 import Haschoo.Types           (ScmValue(..), scmShow)
 import Haschoo.Utils           (ErrOr, showScmList)
 import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
@@ -17,10 +20,11 @@ scmWrite, scmDisplay :: [ScmValue] -> IO (ErrOr ScmValue)
 scmWrite   = scmPrint scmShow "write"
 scmDisplay = scmPrint f "display"
  where
-   f (ScmString s) = return s
-   f (ScmChar   c) = return [c]
-   f (ScmList   l) = showScmList f l
-   f x             = scmShow x
+   f (ScmString  s) = return (elems s)
+   f (ScmMString s) = getElems s
+   f (ScmChar    c) = return [c]
+   f (ScmList    l) = showScmList f l
+   f x              = scmShow x
 
 -- TODO: always goes to stdout
 scmPrint :: (ScmValue -> IO String) -> String -> [ScmValue] -> IO (ErrOr ScmValue)

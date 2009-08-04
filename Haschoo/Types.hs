@@ -9,7 +9,10 @@
 
 module Haschoo.Types
    ( Haschoo, runHaschoo, withHaschoo
-   , ScmValue(..), MacroCall(..), isTrue, pairToList, listToPair
+   , ScmValue(..), MacroCall(..)
+   , isTrue
+   , toScmString, toScmMString
+   , pairToList, listToPair
    , Context(..), mkContext, addToContext, contextLookup, contextSize
    , scmShow
    ) where
@@ -20,6 +23,8 @@ import Control.Monad                   (liftM2)
 import Control.Monad.Error             (ErrorT, MonadError, runErrorT)
 import Control.Monad.State.Strict      (StateT, MonadState, evalStateT)
 import Control.Monad.Trans             (MonadIO, liftIO)
+import Data.Array.IO                   (IOUArray, newListArray, getElems)
+import Data.Array.Unboxed              (UArray, elems, listArray)
 import Data.Complex                    (Complex((:+)))
 import Data.IORef                      (IORef, readIORef, newIORef)
 import Data.IntMap                     (IntMap)
@@ -56,7 +61,8 @@ data ScmValue = ScmPrim  String !([ScmValue] -> Haschoo   ScmValue)
 
               | ScmBool       !Bool
               | ScmChar       !Char
-              | ScmString     !String
+              | ScmString     !(UArray Int Char)
+              | ScmMString    !(IOUArray Int Char)
               | ScmInt        !Integer
               | ScmRat        !Rational
               | ScmReal       !Double
@@ -120,6 +126,12 @@ listToPair (x:xs) = second Just <$> go x xs
       b         <- newIORef zs
       return (ScmPair a b, fin)
 
+toScmString :: String -> ScmValue
+toScmString s = ScmString $ listArray (0, length s - 1) s
+
+toScmMString :: String -> IO ScmValue
+toScmMString s = ScmMString <$> newListArray (0, length s - 1) s
+
 data Context = Context { idMap  :: TrieMap Char Int
                        , valMap :: IntMap ScmValue }
 
@@ -170,11 +182,8 @@ scmShow (ScmChar c) | c == ' '  = return  "#\\space"
                     | c == '\n' = return  "#\\newline"
                     | otherwise = return$ "#\\" ++ [c]
 
-scmShow (ScmString s) = return$ '"' : foldr ((.) . f) id s "\""
- where
-   f c | c == '\\' = showString "\\\\"
-       | c == '\"' = showString "\\\""
-       | otherwise = showChar c
+scmShow (ScmString  s) = return$ showScmString (elems s)
+scmShow (ScmMString s) = showScmString <$> getElems s
 
 scmShow (ScmDottedList a b) = do
    as <- showScmList scmShow a
@@ -198,3 +207,10 @@ scmShow (ScmPair car cdr) = do
    go x = (" . "++) . (++")") <$> scmShow x
 
 scmShow (ScmSyntax _ _) = return "<syntax rules>"
+
+showScmString :: String -> String
+showScmString s = '"' : foldr ((.) . f) id s "\""
+ where
+   f c | c == '\\' = showString "\\\\"
+       | c == '\"' = showString "\\\""
+       | otherwise = showChar c

@@ -5,18 +5,20 @@
 module Haschoo.Evaluator.Standard.Numeric
    (procedures, isNumeric, isExact, numEq, asInt) where
 
-import Control.Arrow ((&&&), (***))
-import Control.Monad (ap, foldM)
-import Data.Char     (intToDigit)
-import Data.Complex  ( Complex((:+)), mkPolar
-                     , imagPart, realPart, phase, magnitude)
-import Data.Ratio    (numerator, denominator, approxRational)
-import Data.Function (on)
-import Numeric       (showIntAtBase, showSigned)
+import Control.Arrow     ((&&&), (***))
+import Control.Monad     (ap, foldM)
+import Data.Array.IArray (elems)
+import Data.Array.MArray (getElems)
+import Data.Char         (intToDigit)
+import Data.Complex      ( Complex((:+)), mkPolar
+                         , imagPart, realPart, phase, magnitude)
+import Data.Ratio        (numerator, denominator, approxRational)
+import Data.Function     (on)
+import Numeric           (showIntAtBase, showSigned)
 import Text.ParserCombinators.Poly.Plain (runParser)
 
 import qualified Haschoo.Parser as Parser
-import           Haschoo.Types           (ScmValue(..))
+import           Haschoo.Types           (ScmValue(..), toScmMString)
 import           Haschoo.Utils           (ErrOr, allM, ($<), (.:))
 import           Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs, notInt)
 
@@ -90,11 +92,11 @@ procedures = map (\(a,b) -> (a, ScmFunc a (return . b)))
    , ("angle",            scmAngle)
 
    , ("exact->inexact", scmToInexact)
-   , ("inexact->exact", scmToExact)
+   , ("inexact->exact", scmToExact) ]
 
-   , ("number->string", scmToString)
-   , ("string->number", scmToNumber)
-   ]
+   ++ map (\(a,b) -> (a, ScmFunc a b))
+   [ ("number->string", scmToString)
+   , ("string->number", scmToNumber) ]
 
 ---- Predicates
 
@@ -429,17 +431,23 @@ scmToExact _                  = tooManyArgs "exact->inexact"
 
 ---- number->string string->number
 
-scmToString, scmToNumber :: [ScmValue] -> ErrOr ScmValue
+scmToString, scmToNumber :: [ScmValue] -> IO (ErrOr ScmValue)
 
 scmToString (x:xs) | isNumeric x =
    case xs of
-        []             -> fmap ScmString $ f x 10
-        [ScmInt radix] -> if radix `elem` [2,8,10,16]
-                             then fmap ScmString $ f x (fromInteger radix)
-                             else fail "number->string :: invalid radix"
-        [_]            -> notInt      "number->string"
-        _              -> tooManyArgs "number->string"
+        []             -> g x 10
+        [ScmInt radix] ->
+           if radix `elem` [2,8,10,16]
+              then g x (fromInteger radix)
+              else return$ fail "number->string :: invalid radix"
+
+        [_] -> return$ notInt      "number->string"
+        _   -> return$ tooManyArgs "number->string"
  where
+   g n radix = case f n radix of
+                    Left  err -> return$ fail err
+                    Right s   -> fmap Right $ toScmMString s
+
    f (ScmInt i) radix = Right $ showInt radix i
    f (ScmRat r) radix = Right $
       concat [showInt radix (numerator r), "/", showInt radix (denominator r)]
@@ -463,26 +471,29 @@ scmToString (x:xs) | isNumeric x =
 
    showInt radix i = showSigned (showIntAtBase radix intToDigit) 0 i ""
 
-scmToString [] = tooFewArgs "number->string"
-scmToString _  = notNum     "number->string"
+scmToString [] = return$ tooFewArgs "number->string"
+scmToString _  = return$ notNum     "number->string"
 
-scmToNumber (ScmString s : xs) =
+scmToNumber (ScmString  s : xs) = return$ toNumHelper xs     (elems s)
+scmToNumber (ScmMString s : xs) = fmap   (toNumHelper xs) (getElems s)
+scmToNumber [] = return$ tooFewArgs "string->number"
+scmToNumber _  = return$ fail "Nonstring argument to string->number"
+
+toNumHelper :: [ScmValue] -> String -> ErrOr ScmValue
+toNumHelper xs s =
    case xs of
         []             -> Right $ f s 10
         [ScmInt radix] -> if radix `elem` [2,8,10,16]
                              then Right $ f s (fromInteger radix)
                              else fail "string->number :: invalid radix"
-        [_]            -> notInt      "string->number"
-        _              -> tooManyArgs "string->number"
+        [_]            -> notInt       "string->number"
+        _              -> tooManyArgs  "string->number"
  where
    f str radix =
       let (mn,_) = runParser (Parser.number radix) str
        in case mn of
                Right n | isNumeric n -> n
                _                     -> ScmBool False
-
-scmToNumber [] = tooFewArgs "string->number"
-scmToNumber _  = fail "Nonstring argument to string->number"
 
 -------------
 

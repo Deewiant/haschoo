@@ -3,7 +3,9 @@
 module Haschoo.Evaluator.Standard.Equivalence
    (procedures, scmEq, scmEqv, scmEqual) where
 
-import Control.Arrow ((&&&))
+import Control.Arrow     ((&&&))
+import Control.Monad     (liftM2)
+import Data.Array.MArray (getElems)
 
 import Haschoo.Types                      (ScmValue(..), pairToList)
 import Haschoo.Utils                      (ErrOr, ($<), (.:), eqWithM, ptrEq)
@@ -24,6 +26,7 @@ scmEqv   (ScmChar         a)   (ScmChar         b) = return$ a == b
 scmEqv   (ScmList         a)   (ScmList         b) = ptrEq a b
 scmEqv x@(ScmDottedList _ _) y@(ScmDottedList _ _) = ptrEq x y
 scmEqv   (ScmString       a)   (ScmString       b) = ptrEq a b
+scmEqv   (ScmMString      a)   (ScmMString      b) = ptrEq a b
 scmEqv   (ScmFunc _       a)   (ScmFunc _       b) = ptrEq a b
 scmEqv   (ScmPrim _       a)   (ScmPrim _       b) = ptrEq a b
 scmEqv a b =
@@ -49,7 +52,8 @@ scmEqual x@(ScmDottedList _ _) y@(ScmPair _ _) =
 scmEqual y@(ScmPair _ _) x@(ScmList       _)   = scmEqual x y
 scmEqual y@(ScmPair _ _) x@(ScmDottedList _ _) = scmEqual x y
 
-scmEqual (ScmString a) (ScmString b) = return$ a == b
+scmEqual (ScmString  a) (ScmString  b) = return$ a == b
+scmEqual (ScmMString a) (ScmMString b) = liftM2 (==) (getElems a) (getElems b)
 scmEqual a b = scmEqv a b
 
 scmEquivalence :: (ScmValue -> ScmValue -> IO Bool) -> String

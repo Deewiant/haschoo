@@ -14,7 +14,7 @@ import Text.ParserCombinators.Poly.Plain
    ( Parser, next, apply, satisfy, discard, commit, adjustErr, onFail, reparse
    , many, many1, oneOf, oneOf', bracket, indent, optional)
 
-import Haschoo.Types (ScmValue(..))
+import Haschoo.Types (ScmValue(..), toScmString)
 import Haschoo.Utils (void)
 
 program :: Parser Char [ScmValue]
@@ -76,7 +76,7 @@ character = do
 
 quotedString :: Parser Char ScmValue
 quotedString =
-   ScmString <$>
+   toScmString <$>
       (join bracket (one '"') . many $
          oneOf [ one '\\' >> commit (pElem "\\\"")
                                 `usingError` "Invalid escaped character"
