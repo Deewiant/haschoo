@@ -20,17 +20,13 @@ procedures = map (\(a,b) -> (a, ScmFunc a b))
    ]
 
 scmEq, scmEqv, scmEqual :: ScmValue -> ScmValue -> IO Bool
-scmEqv   (ScmBool         a)   (ScmBool         b) = return$ a == b
-scmEqv   (ScmIdentifier   a)   (ScmIdentifier   b) = return$ a == b
-scmEqv   (ScmChar         a)   (ScmChar         b) = return$ a == b
-scmEqv   (ScmList         a)   (ScmList         b) = ptrEq a b
-scmEqv x@(ScmDottedList _ _) y@(ScmDottedList _ _) = ptrEq x y
-scmEqv   (ScmString       a)   (ScmString       b) = ptrEq a b
-scmEqv   (ScmMString      a)   (ScmMString      b) = ptrEq a b
-scmEqv   (ScmFunc _       a)   (ScmFunc _       b) = ptrEq a b
-scmEqv   (ScmPrim _       a)   (ScmPrim _       b) = ptrEq a b
+scmEqv (ScmBool       a) (ScmBool       b) = return$ a == b
+scmEqv (ScmIdentifier a) (ScmIdentifier b) = return$ a == b
+scmEqv (ScmChar       a) (ScmChar       b) = return$ a == b
 scmEqv a b =
-   return $ isNumeric a && isNumeric b && isExact a == isExact b && numEq a b
+   if isNumeric a && isNumeric b
+      then return$ isExact a == isExact b && numEq a b
+      else ptrEq a b
 
 scmEq a b = if isNumeric a && isNumeric b
                then ptrEq  a b
