@@ -5,7 +5,7 @@ module Haschoo.Evaluator.Standard.Symbols (procedures) where
 import Data.Array.IArray (elems)
 import Data.Array.MArray (getElems)
 
-import Haschoo.Types           (ScmValue(..), toScmString, toScmMString)
+import Haschoo.Types           (ScmValue(..), toScmString)
 import Haschoo.Utils           (ErrOr)
 import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
 
