@@ -10,6 +10,7 @@ import qualified Haschoo.Evaluator.Standard.Equivalence as Equivalence
 import qualified Haschoo.Evaluator.Standard.IO          as IO
 import qualified Haschoo.Evaluator.Standard.Numeric     as Numeric
 import qualified Haschoo.Evaluator.Standard.PairsLists  as PairsLists
+import qualified Haschoo.Evaluator.Standard.Strings     as Strings
 import qualified Haschoo.Evaluator.Standard.Symbols     as Symbols
 
 procedures :: [(String, ScmValue)]
@@ -20,7 +21,8 @@ procedures = concat [ Boolean.procedures
                     , IO.procedures
                     , Numeric.procedures
                     , PairsLists.procedures
-                    , Symbols.procedures ]
+                    , Symbols.procedures
+                    , Strings.procedures ]
 
 context :: Context
 context = mkContext procedures

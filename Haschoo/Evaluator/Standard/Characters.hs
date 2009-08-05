@@ -9,7 +9,7 @@ import Data.Function (on)
 
 import Haschoo.Types           (ScmValue(..))
 import Haschoo.Utils           (ErrOr, ($<), (.:))
-import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs, notInt)
+import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs, notInt, notChar)
 
 procedures :: [(String, ScmValue)]
 procedures = map (\(a,b) -> (a, ScmFunc a (return . b)))
@@ -81,9 +81,6 @@ scmApply _ s []          = tooFewArgs  s
 scmApply _ s _           = tooManyArgs s
 
 ------
-
-notChar :: String -> ErrOr a
-notChar = fail . ("Noncharacter argument to " ++)
 
 toChar :: Integer -> Char
 toChar = toEnum . fromInteger
