@@ -21,11 +21,11 @@ procedures = map (\(a,b) -> (a, ScmFunc a (return . b)))
    , "char<=?" $< id &&& fmap ScmBool .: scmCompare (<=) id
    , "char>=?" $< id &&& fmap ScmBool .: scmCompare (>=) id
 
-   , "char=?"  $< id &&& fmap ScmBool .: scmCompare (==) toLower
-   , "char<?"  $< id &&& fmap ScmBool .: scmCompare (<)  toLower
-   , "char>?"  $< id &&& fmap ScmBool .: scmCompare (>)  toLower
-   , "char<=?" $< id &&& fmap ScmBool .: scmCompare (<=) toLower
-   , "char>=?" $< id &&& fmap ScmBool .: scmCompare (>=) toLower
+   , "char-ci=?"  $< id &&& fmap ScmBool .: scmCompare (==) toLower
+   , "char-ci<?"  $< id &&& fmap ScmBool .: scmCompare (<)  toLower
+   , "char-ci>?"  $< id &&& fmap ScmBool .: scmCompare (>)  toLower
+   , "char-ci<=?" $< id &&& fmap ScmBool .: scmCompare (<=) toLower
+   , "char-ci>=?" $< id &&& fmap ScmBool .: scmCompare (>=) toLower
 
    , "char-alphabetic?" $< id &&& fmap ScmBool .: scmProperty isAlpha
    , "char-numeric?"    $< id &&& fmap ScmBool .: scmProperty isDigit
