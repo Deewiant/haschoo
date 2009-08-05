@@ -83,7 +83,7 @@ scmApply _ s _           = tooManyArgs s
 ------
 
 notChar :: String -> ErrOr a
-notChar = fail . ("Noncharacter argument to primitive procedure " ++)
+notChar = fail . ("Noncharacter argument to " ++)
 
 toChar :: Integer -> Char
 toChar = toEnum . fromInteger
