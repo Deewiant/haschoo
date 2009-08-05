@@ -5,14 +5,14 @@ module Haschoo.Evaluator.Standard.Symbols (procedures) where
 import Data.Array.IArray (elems)
 import Data.Array.MArray (getElems)
 
-import Haschoo.Types           (ScmValue(..), toScmMString)
+import Haschoo.Types           (ScmValue(..), toScmString, toScmMString)
 import Haschoo.Utils           (ErrOr)
 import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs)
 
 procedures :: [(String, ScmValue)]
 procedures = map (\(a,b) -> (a, ScmFunc a b))
    [ ("symbol?",        return . fmap ScmBool . scmIsSymbol)
-   , ("symbol->string", scmToString)
+   , ("symbol->string", return . scmToString)
    , ("string->symbol", scmToSymbol)
    ]
 
@@ -22,12 +22,13 @@ scmIsSymbol [_]               = Right False
 scmIsSymbol []                = tooFewArgs  "symbol?"
 scmIsSymbol _                 = tooManyArgs "symbol?"
 
-scmToString, scmToSymbol :: [ScmValue] -> IO (ErrOr ScmValue)
-scmToString [ScmIdentifier x] = fmap Right (toScmMString x)
-scmToString [_]               = return$ notSymbol   "symbol->string"
-scmToString []                = return$ tooFewArgs  "symbol->string"
-scmToString _                 = return$ tooManyArgs "symbol->string"
+scmToString :: [ScmValue] -> ErrOr ScmValue
+scmToString [ScmIdentifier x] = Right (toScmString x)
+scmToString [_]               = notSymbol   "symbol->string"
+scmToString []                = tooFewArgs  "symbol->string"
+scmToString _                 = tooManyArgs "symbol->string"
 
+scmToSymbol :: [ScmValue] -> IO (ErrOr ScmValue)
 scmToSymbol [ScmString x]  = return$ Right . ScmIdentifier  $    elems x
 scmToSymbol [ScmMString x] = fmap   (Right . ScmIdentifier) $ getElems x
 scmToSymbol [_]            = return$ notSymbol   "string->symbol"
