@@ -19,7 +19,7 @@ import Data.Function       (on)
 import Haschoo.Types           ( ScmValue(..), toScmMString
                                , listToPair, pairToList)
 import Haschoo.Utils           (ErrOr, ($<), (.:))
-import Haschoo.Evaluator.Utils ( tooFewArgs, tooManyArgs
+import Haschoo.Evaluator.Utils ( tooFewArgs, tooManyArgs, immutable
                                , notChar, notInt, notList)
 
 procedures :: [(String, ScmValue)]
@@ -108,7 +108,7 @@ scmSet [x, ScmInt idx, ScmChar c] =
            tryToIdx "string-set!" (msLen s) idx (\i -> writeArray s i c)
            return (Right ScmVoid)
 
-        ScmString  _ -> immutable "string-set!"
+        ScmString  _ -> return$ immutable "string-set!"
         _            -> return$ notString "string-set!"
 
 scmSet [_, _, ScmChar _] = return$ notInt      "string-set!"
@@ -212,7 +212,7 @@ scmFill [x, ScmChar c] =
            mapM_ (\i -> writeArray s i c) [a..b]
            return (Right ScmVoid)
 
-        ScmString  _ -> immutable "string-fill!"
+        ScmString  _ -> return$ immutable "string-fill!"
         _            -> return$ notString "string-fill!"
 
 scmFill [_, _]  = return$ notChar     "string-fill!"
@@ -223,9 +223,6 @@ scmFill _       = return$ tooFewArgs  "string-fill!"
 
 notString :: String -> ErrOr a
 notString = fail . ("Nonstring argument to " ++)
-
-immutable :: String -> IO (ErrOr a)
-immutable = return . fail . ("Immutable argument to " ++)
 
 isString :: ScmValue -> Bool
 isString (ScmString  _) = True
