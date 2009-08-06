@@ -12,30 +12,31 @@ module Haschoo.Types
    , ScmValue(..), MacroCall(..)
    , isTrue
    , toScmString, toScmMString
+   , toScmVector
    , pairToList, listToPair
    , Context(..), mkContext, addToContext, contextLookup, contextSize
    , scmShow
    ) where
 
-import Control.Applicative             ((<$>))
-import Control.Arrow                   (second)
-import Control.Monad                   (liftM2)
-import Control.Monad.Error             (ErrorT, MonadError, runErrorT)
-import Control.Monad.State.Strict      (StateT, MonadState, evalStateT)
-import Control.Monad.Trans             (MonadIO, liftIO)
-import Data.Array.IO                   (IOUArray, newListArray, getElems)
-import Data.Array.Unboxed              (UArray, elems, listArray)
-import Data.Complex                    (Complex((:+)))
-import Data.IORef                      (IORef, readIORef, newIORef)
-import Data.IntMap                     (IntMap)
-import Data.ListTrie.Patricia.Map.Enum (TrieMap)
-import Data.Maybe                      (fromMaybe)
-import Data.Ratio                      (numerator, denominator)
-import System.IO.Unsafe                (unsafeInterleaveIO)
-import Text.Show.Functions             ()
+import Control.Applicative        ((<$>))
+import Control.Arrow              (second)
+import Control.Monad              (liftM2)
+import Control.Monad.Error        (ErrorT, MonadError, runErrorT)
+import Control.Monad.State.Strict (StateT, MonadState, evalStateT)
+import Control.Monad.Trans        (MonadIO, liftIO)
+import Data.Array.IO              (IOArray, IOUArray, newListArray, getElems)
+import Data.Array.Unboxed         (Array, UArray, elems, listArray)
+import Data.Complex               (Complex((:+)))
+import Data.IORef                 (IORef, readIORef, newIORef)
+import Data.IntMap                (IntMap)
+import Data.Maybe                 (fromMaybe)
+import Data.Ratio                 (numerator, denominator)
+import System.IO.Unsafe           (unsafeInterleaveIO)
+import Text.Show.Functions        ()
 
 import qualified Data.IntMap as IM
 import qualified Data.ListTrie.Patricia.Map.Enum as TM
+import Data.ListTrie.Patricia.Map.Enum (TrieMap)
 
 import Haschoo.Utils (ErrOr, swap, showScmList)
 
@@ -61,14 +62,16 @@ data ScmValue = ScmPrim  String !([ScmValue] -> Haschoo   ScmValue)
 
               | ScmBool       !Bool
               | ScmChar       !Char
-              | ScmString     !(UArray Int Char)
-              | ScmMString    !(IOUArray Int Char)
               | ScmInt        !Integer
               | ScmRat        !Rational
               | ScmReal       !Double
               | ScmComplex    !(Complex Double)
               | ScmIdentifier !String
               | ScmPair       !(IORef ScmValue) !(IORef ScmValue)
+              | ScmString     !(  UArray Int Char)
+              | ScmMString    !(IOUArray Int Char)
+              | ScmVector     !(   Array Int ScmValue)
+              | ScmMVector    !( IOArray Int ScmValue)
 
               | ScmSyntax { patterns :: ![(ScmValue, ScmValue, [String])]
                           , literals :: ![(String, Maybe ScmValue)] }
@@ -132,6 +135,9 @@ toScmString s = ScmString $ listArray (0, length s - 1) s
 toScmMString :: String -> IO ScmValue
 toScmMString s = ScmMString <$> newListArray (0, length s - 1) s
 
+toScmVector :: [ScmValue] -> ScmValue
+toScmVector v = ScmVector $ listArray (0, length v - 1) v
+
 data Context = Context { idMap  :: TrieMap Char Int
                        , valMap :: IntMap ScmValue }
 
@@ -184,6 +190,9 @@ scmShow (ScmChar c) | c == ' '  = return  "#\\space"
 
 scmShow (ScmString  s) = return$ showScmString (elems s)
 scmShow (ScmMString s) = showScmString <$> getElems s
+
+scmShow (ScmVector  v) = ('#':) <$>  showScmList scmShow       (elems v)
+scmShow (ScmMVector v) = ('#':) <$> (showScmList scmShow =<< getElems v)
 
 scmShow (ScmDottedList a b) = do
    as <- showScmList scmShow a

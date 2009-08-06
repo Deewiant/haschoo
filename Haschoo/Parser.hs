@@ -14,7 +14,7 @@ import Text.ParserCombinators.Poly.Plain
    ( Parser, next, apply, satisfy, discard, commit, adjustErr, onFail, reparse
    , many, many1, oneOf, oneOf', bracket, indent, optional)
 
-import Haschoo.Types (ScmValue(..), toScmString)
+import Haschoo.Types (ScmValue(..), toScmString, toScmVector)
 import Haschoo.Utils (void)
 
 program :: Parser Char [ScmValue]
@@ -98,8 +98,7 @@ list =
 vector :: Parser Char ScmValue
 vector = do
    one '#'
-   fail "vectors not yet supported!"
-   --ScmVector <$> bracket (one '(') (atmosphere >> one ')') values
+   toScmVector <$> bracket (one '(') (atmosphere >> one ')') values
 
 number :: Int -> Parser Char ScmValue
 number defRadix = do
