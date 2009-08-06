@@ -31,8 +31,8 @@ procedures = map (\(a,b) -> (a, ScmFunc a b))
 
    , ("string-length", scmLength)
 
-   , ("string-ref", scmRef)
-   , ("string-set", scmSet)
+   , ("string-ref",  scmRef)
+   , ("string-set!", scmSet)
 
    , "string=?"  $< id &&& fmap (fmap ScmBool) .: scmCompare (==) id
    , "string<?"  $< id &&& fmap (fmap ScmBool) .: scmCompare (<)  id
