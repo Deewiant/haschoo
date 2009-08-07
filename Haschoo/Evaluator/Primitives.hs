@@ -7,6 +7,7 @@ import Control.Monad       (when)
 import Control.Monad.Error (throwError)
 import Control.Monad.State (get, put)
 import Control.Monad.Trans (liftIO)
+import Data.Array.IArray   (listArray, elems, bounds)
 import Data.IORef          ( IORef, readIORef
                            , newIORef, modifyIORef, writeIORef)
 import Data.Maybe          (isJust)
@@ -162,7 +163,16 @@ scmSyntaxRules (ScmList lits : rest) = do
                      return (ScmList pat)
                   ScmDottedList (ScmIdentifier _keyword : pat) pat' ->
                      return (ScmDottedList pat pat')
-                  -- TODO: vector
+
+                  ScmVector xs | maxIdx >= 0 ->
+                     case elems xs of
+                          ScmIdentifier _keyword : pat ->
+                             return (ScmVector $ listArray (0, maxIdx-1) pat)
+
+                          _ -> badPattern
+                   where
+                     maxIdx = snd (bounds xs)
+
                   _ -> badPattern
 
       checkPat pat
@@ -215,7 +225,7 @@ scmSyntaxRules (ScmList lits : rest) = do
             found' <- or <$> mapM (go found) ls
             go found' x
 
-         -- TODO: vector
+         go found (ScmVector v) = go found (ScmList $ elems v)
 
          go found _ = return found
 
@@ -236,7 +246,7 @@ scmSyntaxRules (ScmList lits : rest) = do
             found' <- or <$> mapM (go found var n) ls
             go found' var n x
 
-         -- TODO: vector
+         go found var n (ScmVector v) = go found var n (ScmList $ elems v)
 
          go found _ _ _ = return found
 

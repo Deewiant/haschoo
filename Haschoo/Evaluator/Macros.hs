@@ -8,6 +8,7 @@ import Control.Monad.Error         (throwError)
 import Control.Monad.Loops         (andM, allM, firstM)
 import Control.Monad.Trans         (MonadIO, lift, liftIO)
 import Control.Monad.Writer.Strict (WriterT, runWriterT, tell)
+import Data.Array.IArray           (elems)
 import Data.IORef                  (IORef)
 import Data.List                   (find)
 import Data.Maybe                  (isNothing)
@@ -19,7 +20,8 @@ import Data.ListTrie.Patricia.Map.Enum (TrieMap)
 import Haschoo.Types                          ( Haschoo
                                               , ScmValue
                                                    ( ScmMacro, ScmIdentifier
-                                                   , ScmList, ScmDottedList)
+                                                   , ScmList, ScmDottedList
+                                                   , ScmVector)
                                               , MacroCall(..)
                                               , Context)
 import Haschoo.Utils                          ( fst3, initLast2Maybe
@@ -112,7 +114,16 @@ match1 lits args (ScmDottedList ps p) =
         ScmDottedList as a -> andM [allMatch lits as ps, match1 lits a p]
         _                  -> return False
 
--- TODO: vectors
+-- ... "P is a vector of the form #(P1 ... Pn) and F is a vector of n forms
+-- that match P1 through Pn" ...
+--
+-- ... "P is of the form #(P1 ... Pn Pm <ellipsis>) where <ellipsis> is the
+-- identifier ... and F is a vector of n or more forms, the first n of which
+-- match P1 through Pn and each remaining element matches Pm" ...
+--
+-- Just forward to the list one, the rules are identical
+match1 lits (ScmVector args) (ScmVector ps) =
+   match1 lits (ScmList $ elems args) (ScmList $ elems ps)
 
 -- ... "P is a datum and F is equal to P in the sense of the equal? procedure".
 match1 _ arg p = liftIO $ scmEqual arg p
