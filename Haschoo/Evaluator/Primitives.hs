@@ -221,6 +221,9 @@ scmSyntaxRules (ScmList lits : rest) = do
          go _ (ScmDottedList _ (ScmIdentifier "...")) =
             srErr "Ellipsis terminating improper list"
 
+         go _ (ScmDottedList ls _) | isJust (findEllipsis ls) =
+            srErr "Ellipsis in improper list"
+
          go found (ScmDottedList ls x) = do
             found' <- or <$> mapM (go found) ls
             go found' x
