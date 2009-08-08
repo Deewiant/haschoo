@@ -7,6 +7,7 @@ import qualified Haschoo.Evaluator.Standard.Boolean     as Boolean
 import qualified Haschoo.Evaluator.Standard.Characters  as Characters
 import qualified Haschoo.Evaluator.Standard.Control     as Control
 import qualified Haschoo.Evaluator.Standard.Equivalence as Equivalence
+import qualified Haschoo.Evaluator.Standard.Eval        as Eval
 import qualified Haschoo.Evaluator.Standard.IO          as IO
 import qualified Haschoo.Evaluator.Standard.Numeric     as Numeric
 import qualified Haschoo.Evaluator.Standard.PairsLists  as PairsLists
@@ -19,6 +20,7 @@ procedures = concat [ Boolean.procedures
                     , Characters.procedures
                     , Control.procedures
                     , Equivalence.procedures
+                    , Eval.procedures
                     , IO.procedures
                     , Numeric.procedures
                     , PairsLists.procedures

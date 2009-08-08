@@ -84,6 +84,9 @@ data ScmValue = ScmPrim  String !([ScmValue] -> Haschoo   ScmValue)
               -- The "unspecified value" returned by IO procedures and such
               | ScmVoid
 
+              -- The "environment-specifier" used by eval-related procedures
+              | ScmContext ![Context]
+
 -- The form of the macro usage:
 --
 -- (macro foo bar), (macro foo . bar), or #(macro foo bar)
@@ -215,7 +218,8 @@ scmShow (ScmPair car cdr) = do
 
    go x = (" . "++) . (++")") <$> scmShow x
 
-scmShow (ScmSyntax _ _) = return "<syntax rules>"
+scmShow (ScmSyntax  _ _) = return "<syntax rules>"
+scmShow (ScmContext _)   = return "<environment specifier>"
 
 showScmString :: String -> String
 showScmString s = '"' : foldr ((.) . f) id s "\""
