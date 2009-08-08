@@ -15,7 +15,7 @@ module Haschoo.Types
    , toScmVector
    , pairToList, listToPair
    , Context(..), mkContext, addToContext, contextLookup, contextSize
-   , scmShow
+   , scmShow, scmShowWith
    ) where
 
 import Control.Applicative        ((<$>))
@@ -29,6 +29,7 @@ import Data.Array.Unboxed         (Array, UArray, elems, listArray)
 import Data.Complex               (Complex((:+)))
 import Data.IORef                 (IORef, readIORef, newIORef)
 import Data.IntMap                (IntMap)
+import Data.List                  (intercalate)
 import Data.Maybe                 (fromMaybe)
 import Data.Ratio                 (numerator, denominator)
 import System.IO.Unsafe           (unsafeInterleaveIO)
@@ -38,7 +39,7 @@ import qualified Data.IntMap as IM
 import qualified Data.ListTrie.Patricia.Map.Enum as TM
 import Data.ListTrie.Patricia.Map.Enum (TrieMap)
 
-import Haschoo.Utils (ErrOr, swap, showScmList)
+import Haschoo.Utils (ErrOr, swap, lazyMapM)
 
 -- Our main monad
 newtype Haschoo a = Haschoo (StateT HaschState (ErrorT String IO) a)
@@ -170,7 +171,6 @@ scmShow (ScmPrim s _)     = return s
 scmShow (ScmFunc s _)     = return s
 scmShow (ScmMacro s _)    = return s
 scmShow (ScmIdentifier s) = return s
-scmShow (ScmList xs)      = showScmList scmShow xs
 scmShow (ScmInt n)        = return$ show n
 scmShow (ScmReal n)
    | isNaN      n = return "+nan.#"
@@ -191,35 +191,41 @@ scmShow (ScmChar c) | c == ' '  = return  "#\\space"
                     | c == '\n' = return  "#\\newline"
                     | otherwise = return$ "#\\" ++ [c]
 
+scmShow (ScmSyntax  _ _) = return "<syntax rules>"
+scmShow (ScmContext _)   = return "<environment specifier>"
+
 scmShow (ScmString  s) = return$ showScmString (elems s)
 scmShow (ScmMString s) = showScmString <$> getElems s
 
-scmShow (ScmVector  v) = ('#':) <$>  showScmList scmShow       (elems v)
-scmShow (ScmMVector v) = ('#':) <$> (showScmList scmShow =<< getElems v)
+scmShow x = scmShowWith scmShow x
 
-scmShow (ScmDottedList a b) = do
-   as <- showScmList scmShow a
-   bs <- scmShow b
+scmShowWith :: (ScmValue -> IO String) -> ScmValue -> IO String
+scmShowWith f (ScmList xs)        = showScmList f xs
+scmShowWith f (ScmDottedList a b) = do
+   as <- showScmList f a
+   bs <- f b
    return$ concat [init as, " . ", bs, ")"]
 
-scmShow (ScmPair car cdr) = do
+scmShowWith f (ScmVector  v) = ('#':) <$>  showScmList f       (elems v)
+scmShowWith f (ScmMVector v) = ('#':) <$> (showScmList f =<< getElems v)
+
+scmShowWith f (ScmPair car cdr) = do
    a  <- readIORef car
-   as <- scmShow a
+   as <- f a
    ('(':) . (as ++) <$> unsafeInterleaveIO (readIORef cdr >>= go)
  where
    go   (ScmList [])        = return ")"
-   go x@(ScmList _)         = (' ':) . tail <$> scmShow x
-   go x@(ScmDottedList _ _) = (' ':) . tail <$> scmShow x
+   go x@(ScmList _)         = (' ':) . tail <$> f x
+   go x@(ScmDottedList _ _) = (' ':) . tail <$> f x
 
    go (ScmPair x y) = do
       a <- readIORef x
-      as <- scmShow a
+      as <- f a
       (' ':) . (as ++) <$> unsafeInterleaveIO (readIORef y >>= go)
 
-   go x = (" . "++) . (++")") <$> scmShow x
+   go x = (" . "++) . (++")") <$> f x
 
-scmShow (ScmSyntax  _ _) = return "<syntax rules>"
-scmShow (ScmContext _)   = return "<environment specifier>"
+scmShowWith _ _ = error "scmShowWith :: the impossible happened"
 
 showScmString :: String -> String
 showScmString s = '"' : foldr ((.) . f) id s "\""
@@ -227,3 +233,7 @@ showScmString s = '"' : foldr ((.) . f) id s "\""
    f c | c == '\\' = showString "\\\\"
        | c == '\"' = showString "\\\""
        | otherwise = showChar c
+
+showScmList :: (a -> IO String) -> [a] -> IO String
+showScmList f xs =
+   ("("++) . (++")") . intercalate " " <$> lazyMapM f xs

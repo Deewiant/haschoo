@@ -2,13 +2,11 @@
 
 module Haschoo.Utils where
 
-import Control.Applicative   ((<$>))
 import Control.Arrow         (first)
 import Control.Monad         (liftM)
 import Control.Monad.Error   () -- Monad ErrOr
 import Control.Monad.State   (MonadState, get, put)
 import Control.Monad.Trans   (MonadIO, liftIO)
-import Data.List             (intercalate)
 import System.IO             (hPutStr, hPutStrLn, stderr)
 import System.IO.Unsafe      (unsafeInterleaveIO)
 import System.Mem.StableName (makeStableName)
@@ -65,10 +63,6 @@ eqWithM p (x:xs) (y:ys) = do
    if b
       then eqWithM p xs ys
       else return False
-
-showScmList :: (a -> IO String) -> [a] -> IO String
-showScmList f xs =
-   ("("++) . (++")") . intercalate " " <$> lazyMapM f xs
 
 void :: Functor f => f a -> f ()
 void = fmap (const ())
