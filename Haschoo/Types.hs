@@ -32,6 +32,7 @@ import Data.IntMap                (IntMap)
 import Data.List                  (intercalate)
 import Data.Maybe                 (fromMaybe)
 import Data.Ratio                 (numerator, denominator)
+import System.IO                  (Handle)
 import System.IO.Unsafe           (unsafeInterleaveIO)
 import Text.Show.Functions        ()
 
@@ -84,6 +85,10 @@ data ScmValue = ScmPrim  String !([ScmValue] -> Haschoo   ScmValue)
 
               -- The "unspecified value" returned by IO procedures and such
               | ScmVoid
+
+              | ScmInput  !Handle
+              | ScmOutput !Handle
+              | ScmEOF
 
               -- The "environment-specifier" used by eval-related procedures
               | ScmContext ![Context]

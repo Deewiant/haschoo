@@ -1,6 +1,7 @@
 -- File created: 2009-08-05 20:14:14
 
-module Haschoo.Evaluator.Standard.Strings (procedures) where
+module Haschoo.Evaluator.Standard.Strings (procedures, isString, strToList)
+ where
 
 import Control.Applicative ((<$>))
 import Control.Arrow       ((&&&))
@@ -20,7 +21,7 @@ import Haschoo.Types           ( ScmValue(..), toScmMString
                                , listToPair, pairToList)
 import Haschoo.Utils           (ErrOr, ($<), (.:))
 import Haschoo.Evaluator.Utils ( tooFewArgs, tooManyArgs, immutable
-                               , notChar, notInt, notList)
+                               , notChar, notInt, notList, notString)
 
 procedures :: [(String, ScmValue)]
 procedures = map (\(a,b) -> (a, ScmFunc a b))
@@ -164,15 +165,12 @@ scmAppend args@(_:_) = do
 scmAppend [] = return$ tooFewArgs "string-append"
 
 scmToList, scmFromList :: [ScmValue] -> IO (ErrOr ScmValue)
-scmToList [x] = case x of
-                     ScmString  s -> f (elems s)
-                     ScmMString s -> f =<< getElems s
-                     _            -> return$ notString "string->list"
- where
-   f = fmap (Right . fst) . listToPair . map ScmChar
+scmToList [x] | isString x =
+   fmap (Right . fst) . listToPair . map ScmChar =<< strToList x
 
-scmToList [] = return$ tooFewArgs  "string->list"
-scmToList _  = return$ tooManyArgs "string->list"
+scmToList [_] = return$ notString   "string->list"
+scmToList []  = return$ tooFewArgs  "string->list"
+scmToList _   = return$ tooManyArgs "string->list"
 
 scmFromList [x] =
    case x of
@@ -221,13 +219,15 @@ scmFill _       = return$ tooFewArgs  "string-fill!"
 
 ------
 
-notString :: String -> ErrOr a
-notString = fail . ("Nonstring argument to " ++)
-
 isString :: ScmValue -> Bool
 isString (ScmString  _) = True
 isString (ScmMString _) = True
 isString _              = False
+
+strToList :: ScmValue -> IO String
+strToList (ScmString  s) = return (elems s)
+strToList (ScmMString s) = getElems s
+strToList _              = error "strToList :: the impossible happened"
 
 tryToLen :: String -> Integer -> (Int -> IO a) -> IO (ErrOr a)
 tryToLen = tryRange 0 (toInteger (maxBound :: Int))

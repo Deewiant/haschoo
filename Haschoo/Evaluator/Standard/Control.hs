@@ -9,7 +9,7 @@ import Data.Number.Natural (Natural)
 
 import Haschoo.Types           (ScmValue(..), pairToList, listToPair)
 import Haschoo.Utils           (ErrOr, initLast, (.:))
-import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs, notList)
+import Haschoo.Evaluator.Utils (tooFewArgs, tooManyArgs, notList, notProcedure)
 
 procedures :: [(String, ScmValue)]
 procedures = map (\(a,b) -> (a, ScmFunc a b))
@@ -98,8 +98,3 @@ prepArgs s = fmap (fmap transpose . sequence) .: mapM $ \a ->
                            Right (ScmList l) -> Right l
                            _                 -> notList s
            _ -> return$ notList s
-
---- Utils
-
-notProcedure :: String -> ErrOr a
-notProcedure = fail . ("Nonprocedural argument to "++)

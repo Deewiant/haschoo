@@ -1,6 +1,6 @@
 -- File created: 2009-07-11 20:29:49
 
-module Haschoo.Parser (program, number) where
+module Haschoo.Parser (program, value, number) where
 
 import Control.Applicative ((<$>))
 import Control.Monad       (join)
