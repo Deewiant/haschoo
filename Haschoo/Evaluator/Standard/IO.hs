@@ -14,7 +14,8 @@ import System.IO         ( Handle, IOMode(..), stdin, stdout
 import Text.ParserCombinators.Poly.Plain (runParser)
 
 import Haschoo.Parser          (value)
-import Haschoo.Types           (ScmValue(..), scmShow, scmShowWith)
+import Haschoo.Types           ( ScmValue(..), scmShow, scmShowWith
+                               , isContainer)
 import Haschoo.Utils           (ErrOr, ($<), (.:))
 import Haschoo.Evaluator.Utils ( tooFewArgs, tooManyArgs
                                , notProcedure, notString, notChar)
@@ -133,10 +134,11 @@ scmWrite, scmDisplay :: Handle -> [ScmValue] -> IO (ErrOr ScmValue)
 scmWrite   = scmPrint scmShow "write"
 scmDisplay = scmPrint f "display"
  where
-   f (ScmString  s) = return (elems s)
-   f (ScmMString s) = getElems s
-   f (ScmChar    c) = return [c]
-   f x              = scmShowWith f x
+   f (ScmString  s)    = return (elems s)
+   f (ScmMString s)    = getElems s
+   f (ScmChar    c)    = return [c]
+   f x | isContainer x = scmShowWith f x
+       | otherwise     = scmShow x
 
 scmPrint :: (ScmValue -> IO String) -> String
          -> Handle -> [ScmValue] -> IO (ErrOr ScmValue)
