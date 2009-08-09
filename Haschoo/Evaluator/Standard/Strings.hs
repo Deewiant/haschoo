@@ -149,7 +149,7 @@ scmSubstring (_:_:_:_) = return$ tooManyArgs "substring"
 scmSubstring _         = return$ tooFewArgs  "substring"
 
 scmAppend :: [ScmValue] -> IO (ErrOr ScmValue)
-scmAppend args@(_:_) = do
+scmAppend args = do
    x <- foldrM f (Right (0, "")) args
    case x of
         Left  err        -> return (Left err)
@@ -161,8 +161,6 @@ scmAppend args@(_:_) = do
    f _              _          = return$ notString "string-append"
 
    make ml me (n,s) = ml >>= \l -> me >>= \e -> return.Right $ (n+l, s++e)
-
-scmAppend [] = return$ tooFewArgs "string-append"
 
 scmToList, scmFromList :: [ScmValue] -> IO (ErrOr ScmValue)
 scmToList [x] | isString x =
