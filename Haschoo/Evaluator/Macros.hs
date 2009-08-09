@@ -4,6 +4,7 @@
 
 module Haschoo.Evaluator.Macros (mkMacro) where
 
+import Control.Monad               (when)
 import Control.Monad.Error         (throwError)
 import Control.Monad.Loops         (andM, allM, firstM)
 import Control.Monad.Trans         (MonadIO, lift, liftIO)
@@ -92,15 +93,16 @@ match1 lits (ScmList args) (ScmList ps) =
            let (xs, ys) = splitAt (length ps') args
             in do m <- andM [ allMatch lits xs ps'
                             , allM (flip (match1 lits) p) ys]
-                  case p of
-                       ScmIdentifier i ->
-                          tell (PM $ TM.singleton i (Left ys))
-                       _ -> return ()
+                  when m (assignMatches ys p)
                   return m
 
         -- ... "P is a list (P1 ... Pn) and F is a list of n forms that match
         -- P1 through Pn" ...
         _ -> allMatch lits args ps
+
+ where
+   assignMatches ys (ScmIdentifier i) = tell (PM $ TM.singleton i (Left ys))
+   assignMatches _  _                 = return ()
 
 -- ... "P is an improper list (P1 ... Pn . Pm)" ...
 match1 lits args (ScmDottedList ps p) =
