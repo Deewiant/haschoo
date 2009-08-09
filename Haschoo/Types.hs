@@ -198,6 +198,9 @@ scmShow (ScmChar c) | c == ' '  = return  "#\\space"
 
 scmShow (ScmSyntax  _ _) = return "<syntax rules>"
 scmShow (ScmContext _)   = return "<environment specifier>"
+scmShow ScmEOF           = return "<end of file object>"
+scmShow (ScmInput  _)    = return "<input port>"
+scmShow (ScmOutput _)    = return "<output port>"
 
 scmShow (ScmString  s) = return$ showScmString (elems s)
 scmShow (ScmMString s) = showScmString <$> getElems s
