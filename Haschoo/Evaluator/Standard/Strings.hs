@@ -142,7 +142,7 @@ scmSubstring [x, ScmInt a, ScmInt b] =
       fmap join $
       tryRange 0 (toInteger len) "substring" b $ \b' ->
       tryRange 0 (toInteger b')  "substring" a $ \a' ->
-      fmap ScmMString $ els >>= newListArray (a', b')
+      fmap ScmMString $ els >>= newListArray (0, b'-a'-1) . drop a'
 
 scmSubstring [_, _, _] = return$ notInt      "substring"
 scmSubstring (_:_:_:_) = return$ tooManyArgs "substring"
