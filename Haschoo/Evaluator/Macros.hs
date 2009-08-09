@@ -4,6 +4,7 @@
 
 module Haschoo.Evaluator.Macros (mkMacro) where
 
+import Control.Arrow               ((***))
 import Control.Monad               (when)
 import Control.Monad.Error         (throwError)
 import Control.Monad.Loops         (andM, allM, firstM)
@@ -102,7 +103,33 @@ match1 lits (ScmList args) (ScmList ps) =
 
  where
    assignMatches ys (ScmIdentifier i) = tell (PM $ TM.singleton i (Left ys))
-   assignMatches _  _                 = return ()
+
+   -- E.g. pl = (x y z) and ys = [(1 2 3),(4 5 6)]
+   --
+   -- Bind x to [1,4], y to [2,5], z to [3,6]
+   assignMatches ys p =
+      case p of
+           ScmList       _   -> assignList (\(ScmList       l)   -> l)
+           ScmVector     _   -> assignList (\(ScmVector     v)   -> elems v)
+           ScmDottedList _ _ -> assignList (\(ScmDottedList l x) -> x:l)
+           _                 -> return ()
+
+    where
+      assignList toList =
+         let -- Continuing the above example, this would give
+             -- [(x,1),(x,4),(y,2),(y,5),(z,3),(z,6)]
+             lpat    = toList p
+             paired  = concatMap (zip lpat . toList) ys
+
+             -- From then on it's quite trivial
+             matched = map    ((\(ScmIdentifier i) -> i) *** (:[]))
+                     . filter (isIdentifier . fst)
+                     $ paired
+
+          in tell . PM . TM.map Left $ TM.fromListWith (flip (++)) matched
+
+      isIdentifier (ScmIdentifier _) = True
+      isIdentifier _                 = False
 
 -- ... "P is an improper list (P1 ... Pn . Pm)" ...
 match1 lits args (ScmDottedList ps p) =
