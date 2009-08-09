@@ -151,12 +151,13 @@ numEq x y =
 
 scmCompare :: (forall a. Real a => a -> a -> Bool)
            -> String -> [ScmValue] -> ErrOr Bool
-scmCompare _ s [] = tooFewArgs s
-scmCompare p s xs = allM f . (zip`ap`tail) $ xs
+scmCompare p s xs@(_:_:_) = allM f . (zip`ap`tail) $ xs
  where
    f (a,b) = case liftScmRealA2 p a b of
                   Left _ -> notReal s
                   x      -> x
+
+scmCompare _ s _ = tooFewArgs s
 
 scmIsZero :: [ScmValue] -> ErrOr Bool
 scmIsZero [ScmInt     0]    = Right True
