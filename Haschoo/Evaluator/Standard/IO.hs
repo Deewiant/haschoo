@@ -15,7 +15,7 @@ import Text.ParserCombinators.Poly.Plain (runParser)
 
 import Haschoo.Parser          (value)
 import Haschoo.Types           ( ScmValue(..), scmShow, scmShowWith
-                               , isContainer)
+                               , isAggregate)
 import Haschoo.Utils           (ErrOr, ($<), (.:))
 import Haschoo.Evaluator.Utils ( tooFewArgs, tooManyArgs
                                , notProcedure, notString, notChar)
@@ -137,7 +137,7 @@ scmDisplay = scmPrint f "display"
    f (ScmString  s)    = return (elems s)
    f (ScmMString s)    = getElems s
    f (ScmChar    c)    = return [c]
-   f x | isContainer x = scmShowWith f x
+   f x | isAggregate x = scmShowWith f x
        | otherwise     = scmShow x
 
 scmPrint :: (ScmValue -> IO String) -> String

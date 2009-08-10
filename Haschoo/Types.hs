@@ -10,7 +10,7 @@
 module Haschoo.Types
    ( Haschoo, runHaschoo, withHaschoo
    , ScmValue(..), MacroCall(..)
-   , isTrue, isContainer
+   , isTrue, isAggregate
    , toScmString, toScmMString
    , toScmVector
    , pairToList, listToPair
@@ -101,16 +101,16 @@ data ScmValue = ScmPrim  String !([ScmValue] -> Haschoo   ScmValue)
 data MacroCall = MCList   ![ScmValue]
                | MCDotted ![ScmValue] !ScmValue
 
-isTrue, isContainer :: ScmValue -> Bool
+isTrue, isAggregate :: ScmValue -> Bool
 isTrue (ScmBool False) = False
 isTrue _               = True
 
-isContainer (ScmList       _)   = True
-isContainer (ScmDottedList _ _) = True
-isContainer (ScmVector     _)   = True
-isContainer (ScmMVector    _)   = True
-isContainer (ScmPair       _ _) = True
-isContainer _                   = False
+isAggregate (ScmList       _)   = True
+isAggregate (ScmDottedList _ _) = True
+isAggregate (ScmVector     _)   = True
+isAggregate (ScmMVector    _)   = True
+isAggregate (ScmPair       _ _) = True
+isAggregate _                   = False
 
 -- From ScmPair to Left . ScmDottedList or Right . ScmList
 pairToList :: ScmValue -> IO (Either ScmValue ScmValue)
@@ -212,7 +212,7 @@ scmShow (ScmOutput _)    = return "<output port>"
 scmShow (ScmString  s) = return$ showScmString (elems s)
 scmShow (ScmMString s) = showScmString <$> getElems s
 
-scmShow x | isContainer x = scmShowWith scmShow x
+scmShow x | isAggregate x = scmShowWith scmShow x
           | otherwise     = error "scmShow :: the impossible happened"
 
 scmShowWith :: (ScmValue -> IO String) -> ScmValue -> IO String
