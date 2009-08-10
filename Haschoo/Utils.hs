@@ -50,10 +50,16 @@ fromRights []             = Just []
 fromRights (Left _ : _)   = Nothing
 fromRights (Right x : xs) = fmap (x:) (fromRights xs)
 
--- eqWithM p xs ys is kind of like allM (uncurry p) (zip xs ys) but takes into
+-- eqWith p xs ys is kind of like all (uncurry p) (zip xs ys) but takes into
 -- account the lengths of the lists (differing lengths aren't equal)
 --
--- Essentially, monadic list equality according to the given predicate
+-- Essentially, list equality according to the given predicate
+eqWith :: (a -> b -> Bool) -> [a] -> [b] -> Bool
+eqWith _ [] [] = True
+eqWith _ _  [] = False
+eqWith _ [] _  = False
+eqWith p (x:xs) (y:ys) = p x y && eqWith p xs ys
+
 eqWithM :: Monad m => (a -> b -> m Bool) -> [a] -> [b] -> m Bool
 eqWithM _ [] [] = return True
 eqWithM _ _  [] = return False
