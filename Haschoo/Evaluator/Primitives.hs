@@ -207,12 +207,7 @@ scmSyntaxRules (ScmList lits : rest) = do
                     srErr "Ellipsis not preceded by anything in pattern"
 
                  Just (Just (ScmIdentifier i), after) -> do
-                    used <- checkEllipsisUse i (length after) template
-                    when (not used) $
-                       srErr . concat $
-                          [ "No matching ellipsis use for pattern variable '"
-                          , i, "'"]
-
+                    checkEllipsisUse i (length after) template
                     or <$> mapM (go True) ls
 
                  Nothing -> or <$> mapM (go found) ls
@@ -232,26 +227,25 @@ scmSyntaxRules (ScmList lits : rest) = do
 
          go found _ = return found
 
-      checkEllipsisUse = go False
-       where
-         go found var n (ScmList ls) =
+      checkEllipsisUse var n (ScmList ls) =
             case findEllipsis ls of
                  Just (Just (ScmIdentifier i), after) | var == i ->
 
-                    if all elliptic (take n after)
-                       then or <$> mapM (go True var n) ls
+                    if (length . filter elliptic . take n $ after) == n
+                       then mapM_ (checkEllipsisUse var n) ls
                        else srErr $ "Ellipsis use matches pattern variable " ++
                                     "but not ellipsis count"
 
-                 _ -> or <$> mapM (go found var n) ls
+                 _ -> mapM_ (checkEllipsisUse var n) ls
 
-         go found var n (ScmDottedList ls x) = do
-            found' <- or <$> mapM (go found var n) ls
-            go found' var n x
+      checkEllipsisUse var n (ScmDottedList ls x) = do
+         mapM_ (checkEllipsisUse var n) ls
+         checkEllipsisUse var n x
 
-         go found var n (ScmVector v) = go found var n (ScmList $ elems v)
+      checkEllipsisUse var n (ScmVector v) =
+         checkEllipsisUse var n (ScmList $ elems v)
 
-         go found _ _ _ = return found
+      checkEllipsisUse _ _ _ = return ()
 
       assertNoEllipses (ScmList ls) =
          if isJust (findEllipsis ls)
