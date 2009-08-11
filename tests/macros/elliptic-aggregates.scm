@@ -1,7 +1,6 @@
 (define-syntax m (syntax-rules () ((m (x #(a b) ...)) '((a b) ...))))
-(if (null? (m (x)))
-    (begin (write 'ok)(newline)))
+(write (if (null? (m (x))) 'ok 'bad))(newline)
+           
 
-(define-syntax m (syntax-rules () ((m (x ...) (y)) '((x y)...))))
-(if (equal? (m (a b) x) '((a x) (b x)))
-    (begin (write 'ok)(newline)))
+(define-syntax m (syntax-rules () ((m (x ...) y) '((x y)...))))
+(write (if (equal? (m (a b) x) '((a x) (b x))) 'ok 'bad))(newline)
