@@ -4,16 +4,18 @@
 
 module Haschoo.Evaluator.Macros (mkMacro) where
 
-import Control.Arrow               ((***))
-import Control.Monad               (when)
+import Control.Applicative         ((<$>))
+import Control.Arrow               ((***), first)
+import Control.Monad               (liftM2, when)
 import Control.Monad.Error         (throwError)
-import Control.Monad.Loops         (andM, allM, firstM)
+import Control.Monad.Loops         (andM, allM, firstM, untilM)
+import Control.Monad.State.Strict  (State, runState, put, get, modify)
 import Control.Monad.Trans         (MonadIO, lift, liftIO)
 import Control.Monad.Writer.Strict (WriterT, runWriterT, tell)
 import Data.Array.IArray           (elems)
 import Data.IORef                  (IORef)
 import Data.List                   (find)
-import Data.Maybe                  (isNothing)
+import Data.Maybe                  (catMaybes, isNothing)
 import Data.Monoid                 (Monoid(mempty, mappend))
 
 import qualified Data.ListTrie.Patricia.Map.Enum as TM
@@ -25,9 +27,10 @@ import Haschoo.Types                          ( Haschoo
                                                    , ScmList, ScmDottedList
                                                    , ScmVector)
                                               , MacroCall(..)
-                                              , Context)
+                                              , Context
+                                              , isAggregate, toScmVector)
 import Haschoo.Utils                          ( fst3, initLast2Maybe
-                                              , ptrEq, eqWithM)
+                                              , ptrEq, eqWithM, ErrOr)
 import Haschoo.Evaluator.Eval                 (maybeEval)
 import Haschoo.Evaluator.Standard.Equivalence (scmEqual)
 
@@ -53,8 +56,11 @@ mkMacro ctx name pats ls = ScmMacro name f
       case matching of
            Nothing          -> throwError ("Invalid use of macro " ++ name)
            Just (_,v,frees) ->
-              return ( simplifyList $ replaceVars replacements v
-                     , TM.fromList (zip frees (repeat ctx)))
+              case replaceVars (map fst ls) frees replacements v of
+                   Left s -> throwError s
+                   Right replaced ->
+                      return ( simplifyList replaced
+                             , TM.fromList (zip frees (repeat ctx)))
 
 -- Turning MCDotted to ScmDottedList here means that the list in the
 -- ScmDottedList may actually be empty, which can't happen normally
@@ -161,20 +167,107 @@ allMatch :: Lits -> [ScmValue] -> [ScmValue]
          -> WriterT PatternMatches Haschoo Bool
 allMatch = eqWithM . match1
 
-replaceVars :: PatternMatches -> ScmValue -> [ScmValue]
-replaceVars (PM replacements) (ScmIdentifier i)
+replaceVars :: [String] -> [String] -> PatternMatches
+            -> ScmValue -> ErrOr [ScmValue]
+replaceVars _ _ (PM replacements) (ScmIdentifier i)
    | Just r <- TM.lookup i replacements = case r of
-                                               Right r' -> [r']
-                                               Left  rs -> rs
-   | i == "..." = []
+                                               Right r' -> return [r']
+                                               Left  rs -> return rs
+   | i == "..." = return []
 
-replaceVars rs (ScmList l) = [ScmList (concatMap (replaceVars rs) l)]
+replaceVars lits frees rs (ScmList   l) =
+   (:[]) . ScmList     <$> replaceInAggregate lits frees rs l
+replaceVars lits frees rs (ScmVector v) =
+   (:[]) . toScmVector <$> replaceInAggregate lits frees rs (elems v)
 
-replaceVars rs (ScmDottedList l x) =
-   [ScmDottedList (concatMap (replaceVars rs) l)
-                  (simplifyList $ replaceVars rs x)]
+replaceVars lits frees rs (ScmDottedList l x) =
+   (:[]) <$> liftM2 ScmDottedList
+                    (replaceInAggregate lits frees rs l)
+                    (simplifyList <$> replaceVars lits frees rs x)
 
-replaceVars _ v = [v]
+replaceVars _ _ _ v = return [v]
+
+replaceInAggregate :: [String] -> [String] -> PatternMatches
+                   -> [ScmValue] -> ErrOr [ScmValue]
+replaceInAggregate lits frees rs (ag : ScmIdentifier "..." : vs)
+   | isAggregate ag =
+      liftM2 (++) (replaceInEllipticAggregate lits frees rs ag)
+                  (replaceInAggregate lits frees rs vs)
+
+replaceInAggregate lits frees rs (v:vs) =
+   liftM2 (++) (replaceVars lits frees rs v)
+               (replaceInAggregate lits frees rs vs)
+
+replaceInAggregate _ _ _ [] = return []
+
+-- "Pattern variables that occur in subpatterns followed by one or more
+-- instances of the identifier ... are allowed only in subtemplates that are
+-- followed by as many instances of ....
+--
+-- They [the subtemplates] are replaced in the output by all of the subforms
+-- they [the subpatterns] match in the input, distributed as indicated [in the
+-- template, by the positions of the pattern variables]."
+--
+-- With square-bracketed stuff added to make some sense of the last sentence
+-- there.
+--
+-- E.g. pattern (_ (#(a b) ...)) and corresponding template ((a b) ...).
+--
+-- Pattern variables a and b are in a subpattern followed by one ellipsis. We
+-- also have a subtemplate followed by as many ellipses, and a and b are found
+-- nowhere else, so it's valid. Calling this with (_ (#(1 2) #(3 4))) we get
+-- the subtemplate '(a b) ...' replaced by '(1 2) (3 4)'.
+replaceInEllipticAggregate :: [String] -> [String] -> PatternMatches
+                           -> ScmValue -> ErrOr [ScmValue]
+replaceInEllipticAggregate lits frees pms val =
+   let (replaced, (replacementsLeft,_)) =
+          flip runState (TM.empty, pms) $
+             (go val `untilM`
+                do rsLeft <- fst <$> get
+                   return (TM.null rsLeft || anyT (==0) rsLeft))
+
+    in if allT (==0) replacementsLeft
+          then return$ catMaybes replaced
+          else -- For example:
+               --   Pattern has (a ...) (b ...)
+               --   Template has ((a b) ...)
+               --   (a ...) was (1 2) and (b ...) was (3)
+               --   The first (1 3) is fine, but the next (2 ??) isn't
+               throwError "Inconsistent match counts for elliptic variables"
+ where
+   go :: ScmValue -> State (TrieMap Char Int, PatternMatches) (Maybe ScmValue)
+   go (ScmIdentifier i)
+      | i `elem` frees || i `elem` lits = return Nothing
+      | otherwise = do
+         (replacementsLeft, PM pm) <- get
+         let (v, pm') =
+                TM.updateLookup (Just . either (Left . drop 1) Right) i pm
+         case v of
+              Just (Right r')    -> return (Just r')
+              Just (Left [])     -> do modify (first $ TM.insert i 0)
+                                       return Nothing
+              Just (Left (r:rs)) -> do
+                 let rsLeft' =
+                        TM.alter' (Just . maybe (length rs) (subtract 1))
+                                  i replacementsLeft
+                 put (rsLeft', PM pm')
+                 return (Just r)
+
+              -- Blank match: e.g. pattern (a ...) matched ()
+              Nothing -> return Nothing
+
+   go (ScmList   l) = fmap ScmList     . sequence <$> mapM go l
+   go (ScmVector v) = fmap toScmVector . sequence <$> mapM go (elems v)
+
+   go (ScmDottedList l x) = do
+      l' <- sequence <$> mapM go l
+      x' <- go x
+      return (liftM2 ScmDottedList l' x')
+
+   go x = return (Just x)
+
+   anyT f = TM.foldr ((||).f) False
+   allT f = TM.foldr ((&&).f) True
 
 simplifyList :: [ScmValue] -> ScmValue
 simplifyList [v] = v
