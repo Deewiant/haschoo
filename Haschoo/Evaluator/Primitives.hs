@@ -170,13 +170,15 @@ scmSyntaxRules (ScmList lits : rest) = do
                                       then []
                                       else [i]
       frees (ScmList       xs)   = concatMap frees xs
+      frees (ScmVector     v)    = concatMap frees (elems v)
       frees (ScmDottedList xs x) = frees x ++ concatMap frees xs
       frees _                    = []
 
       isLocal s = go pattern
        where
          go (ScmIdentifier i)    = s == i
-         go (ScmList xs)         = any go xs
+         go (ScmList   xs)       = any go xs
+         go (ScmVector v)        = any go (elems v)
          go (ScmDottedList xs x) = any go xs || go x
          go _                    = False
 
