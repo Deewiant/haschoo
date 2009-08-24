@@ -165,7 +165,7 @@ scmIsZero [ScmRat     0]    = Right True
 scmIsZero [ScmReal    0]    = Right True
 scmIsZero [ScmComplex 0]    = Right True
 scmIsZero [x] | isNumeric x = Right False
-scmIsZero [_]               = notNum "positive?"
+scmIsZero [_]               = notNum "zero?"
 scmIsZero _                 = tooManyArgs "zero?"
 
 scmIsPos, scmIsNeg :: [ScmValue] -> ErrOr Bool
