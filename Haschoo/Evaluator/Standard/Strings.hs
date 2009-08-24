@@ -19,7 +19,7 @@ import Data.Function       (on)
 
 import Haschoo.Types           ( ScmValue(..), toScmMString
                                , listToPair, pairToList)
-import Haschoo.Utils           (ErrOr, ($<), (.:))
+import Haschoo.Utils           (ErrOr, ($<), (.:), mapOnPairs)
 import Haschoo.Evaluator.Utils ( tooFewArgs, tooManyArgs, immutable
                                , notChar, notInt, notList, notString)
 
@@ -127,9 +127,8 @@ scmCompare :: (String -> String -> Bool)
            -> [ScmValue] -> IO (ErrOr Bool)
 scmCompare p f s [a, b] =
    if isString a && isString b
-      then Right <$>
-              liftM2 (uncurry p .: unzip .: map (uncurry f) .: zip `on` elems)
-                     (conv a) (conv b)
+      then Right <$> (liftM2 (uncurry p .: mapOnPairs f `on` elems) `on` conv)
+                     a b
       else return$ notString s
  where
    conv (ScmString  x) = return x

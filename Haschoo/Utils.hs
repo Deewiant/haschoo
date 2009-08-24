@@ -2,7 +2,7 @@
 
 module Haschoo.Utils where
 
-import Control.Arrow         (first)
+import Control.Arrow         (first, (***))
 import Control.Monad         (liftM)
 import Control.Monad.Error   () -- Monad ErrOr
 import Control.Monad.State   (MonadState, get, put)
@@ -63,6 +63,14 @@ eqWithM p (x:xs) (y:ys) = do
    if b
       then eqWithM p xs ys
       else return False
+
+-- Applies the function on element pairs while there are enough elements to
+-- form pairs
+mapOnPairs :: (a -> b -> (a,b)) -> [a] -> [b] -> ([a],[b])
+mapOnPairs f (x:xs) (y:ys) = let (x',y') = f x y
+                              in ((x':) *** (y':)) (mapOnPairs f xs ys)
+
+mapOnPairs _ xs ys = (xs, ys)
 
 void :: Functor f => f a -> f ()
 void = fmap (const ())
