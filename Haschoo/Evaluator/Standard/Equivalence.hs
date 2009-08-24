@@ -28,7 +28,11 @@ scmEqv (ScmString     a) (ScmString     b) = ptrEq a b
 scmEqv (ScmMString    a) (ScmMString    b) = ptrEq a b
 scmEqv (ScmVector     a) (ScmVector     b) = ptrEq a b
 scmEqv (ScmMVector    a) (ScmMVector    b) = ptrEq a b
-scmEqv (ScmPair     a b) (ScmPair     x y) = liftM2 (&&) (ptrEq a x) (ptrEq b y)
+
+scmEqv (ScmDottedList a b) (ScmDottedList x y) =
+   liftM2 (&&) (ptrEq a x) (ptrEq b y)
+
+scmEqv (ScmPair a b) (ScmPair x y) = liftM2 (&&) (ptrEq a x) (ptrEq b y)
 scmEqv a b =
    if isNumeric a && isNumeric b
       then return$ isExact a == isExact b && numEq a b
