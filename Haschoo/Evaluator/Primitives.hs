@@ -1,9 +1,10 @@
 -- File created: 2009-07-19 18:34:38
 
+{-# LANGUAGE PatternGuards #-}
 module Haschoo.Evaluator.Primitives (context) where
 
 import Control.Applicative ((<$>))
-import Control.Arrow       (first)
+import Control.Arrow       (first, (&&&))
 import Control.Monad       (when)
 import Control.Monad.Error (throwError)
 import Control.Monad.State (get)
@@ -11,7 +12,11 @@ import Control.Monad.Trans (liftIO)
 import Data.Array.IArray   (listArray, elems, bounds)
 import Data.IORef          ( IORef, readIORef
                            , newIORef, modifyIORef, writeIORef)
-import Data.Maybe          (isJust)
+import Data.Maybe          (isJust, catMaybes)
+import Numeric             (showHex)
+
+import qualified Control.Monad.State.Strict      as S
+import qualified Data.ListTrie.Patricia.Set.Enum as TS
 
 import Haschoo.Types            ( Haschoo, runHaschoo, withHaschoo
                                 , ScmValue(..), isTrue
@@ -164,15 +169,95 @@ scmSyntaxRules (ScmList lits : rest) = do
                   _ -> badPattern
 
       checkPat pat
-      return (pat, template, frees template)
+      let renamedTmp =
+             flip S.evalState 0 $ renameBinds (frees template) template
+
+      return (pat, renamedTmp, TS.toList (frees renamedTmp))
     where
+      -- R5RS 4.3: "If a macro transformer inserts a binding for an identifier
+      -- (variable or keyword), the identifier will in effect be renamed
+      -- throughout its scope to avoid conflicts with other identifiers."
+      --
+      -- This is a HACK!
+      --
+      -- It's also buggy:
+      --   FIXME: top-level defines don't introduce bindings if the variable is
+      --          already bound, this doesn't take that into account.
+      --
+      --   FIXME: nested binding-creators won't work (fixable by calling
+      --          renameBinds from renameUses before doing the rename)
+      --
+      -- Not sure how to deal with this properly... doing the same thing at
+      -- macro expansion time would fix the FIXME but it's still really hacky.
+      renameBinds :: TS.TrieSet Char -> ScmValue -> S.State Int ScmValue
+      renameBinds fs (ScmList (l@(ScmIdentifier lt) : ScmList bs : body))
+         | isLetLike lt = do
+            (rens, bs') <- first catMaybes . unzip <$> mapM renameInLet bs
+            return$ ScmList (l : ScmList bs' : map (renameUses rens) body)
+       where
+         isLetLike "let"    = True
+         isLetLike "let*"   = True
+         isLetLike "letrec" = True
+         isLetLike "do"     = True -- The syntax is close enough
+         isLetLike _        = False
+
+         renameInLet (ScmList (ScmIdentifier i : val))
+            | i `TS.member` fs = do
+               i' <- renameBinding i
+               return (Just (i,i'), ScmList (i' : val))
+
+         renameInLet x = return (Nothing, x)
+
+      renameBinds fs
+         (ScmList (l@(ScmIdentifier "lambda") : ScmList bs : body)) = do
+            (rens, bs') <- first catMaybes . unzip <$> mapM renameInLambda bs
+            return$ ScmList (l : ScmList bs' : map (renameUses rens) body)
+       where
+         renameInLambda (ScmIdentifier i) | i `TS.member` fs =
+            (Just . (,) i &&& id) <$> renameBinding i
+
+         renameInLambda x = return (Nothing, x)
+
+      renameBinds fs
+         (ScmList (d@(ScmIdentifier "define") : ScmList (b:bs) : body)) = do
+            (rens, bs') <- first catMaybes . unzip <$> mapM renameInDefine bs
+            return$ ScmList (d : ScmList (b:bs') : map (renameUses rens) body)
+       where
+         renameInDefine (ScmIdentifier i) | i `TS.member` fs =
+            (Just . (,) i &&& id) <$> renameBinding i
+
+         renameInDefine x = return (Nothing, x)
+
+      renameBinds _ x = return x
+
+      renameUses :: [(String,ScmValue)] -> ScmValue -> ScmValue
+      renameUses [] x = x
+      renameUses rens (ScmIdentifier i)
+         | Just i' <- lookup i rens = i'
+
+      renameUses rens (ScmList  xs) = ScmList   ( map (renameUses rens) xs)
+      renameUses rens (ScmVector v) = ScmVector (fmap (renameUses rens) v)
+      renameUses rens (ScmDottedList xs x) =
+         ScmDottedList (map (renameUses rens) xs) (renameUses rens x)
+
+      renameUses _ x = x
+
+      -- ; is the comment character and thus can't normally be used in
+      -- identifier names, so using it here guarantees the user hasn't
+      -- otherwise used it
+      renameBinding s = do
+         n <- S.get
+         S.put (n+1)
+         return$ ScmIdentifier (';' : showHex n s)
+
+      frees :: ScmValue -> TS.TrieSet Char
       frees (ScmIdentifier i)    = if isLocal i
-                                      then []
-                                      else [i]
-      frees (ScmList       xs)   = concatMap frees xs
-      frees (ScmVector     v)    = concatMap frees (elems v)
-      frees (ScmDottedList xs x) = frees x ++ concatMap frees xs
-      frees _                    = []
+                                      then TS.empty
+                                      else TS.singleton i
+      frees (ScmList       xs)   = TS.unions . map frees $ xs
+      frees (ScmVector     v)    = TS.unions . map frees $ elems v
+      frees (ScmDottedList xs x) = TS.unions . map frees $ (x:xs)
+      frees _                    = TS.empty
 
       isLocal s = go pattern
        where
