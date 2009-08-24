@@ -160,7 +160,7 @@ scmAppend args = do
    f _              (Left err) = return (Left err)
    f _              _          = return$ notString "string-append"
 
-   make ml me (n,s) = ml >>= \l -> me >>= \e -> return.Right $ (n+l, s++e)
+   make ml me (n,s) = ml >>= \l -> me >>= \e -> return.Right $ (n+l, e++s)
 
 scmToList, scmFromList :: [ScmValue] -> IO (ErrOr ScmValue)
 scmToList [x] | isString x =
