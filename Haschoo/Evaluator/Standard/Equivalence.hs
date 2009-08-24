@@ -3,10 +3,12 @@
 module Haschoo.Evaluator.Standard.Equivalence
    (procedures, scmEq, scmEqv, scmEqual) where
 
-import Control.Arrow     ((&&&))
-import Control.Monad     (liftM2)
-import Data.Array.IArray (elems)
-import Data.Array.MArray (getElems)
+import Control.Arrow       ((&&&))
+import Control.Monad       (liftM2, join)
+import Control.Monad.Loops (allM)
+import Data.Array.IArray   (bounds, elems)
+import Data.Array.MArray   (getBounds, getElems, unsafeFreeze)
+import Data.Function       (on)
 
 import Haschoo.Types                      (ScmValue(..), pairToList)
 import Haschoo.Utils                      (ErrOr, ($<), (.:), eqWithM, ptrEq)
@@ -63,6 +65,24 @@ scmEqual (ScmString  a) (ScmString  b) = return$ a == b
 scmEqual (ScmMString a) (ScmMString b) = liftM2 (==) (getElems a) (getElems b)
 scmEqual (ScmString  a) (ScmMString b) = fmap (elems a==) $ getElems b
 scmEqual (ScmMString a) (ScmString  b) = fmap (==elems b) $ getElems a
+
+scmEqual (ScmVector  a) (ScmVector  b) =
+   if bounds a == bounds b
+      then allM (uncurry scmEqual) $ (zip`on`elems) a b
+      else return False
+
+scmEqual (ScmMVector a) (ScmMVector b) = do
+   ba <- getBounds a
+   bb <- getBounds b
+   if ba == bb
+      then join $ (liftM2 (allM (uncurry scmEqual) .: zip) `on` getElems) a b
+      else return False
+
+scmEqual a@(ScmVector _)  (ScmMVector b) =
+   unsafeFreeze b >>= scmEqual a . ScmVector
+scmEqual  (ScmMVector a) b@(ScmVector _) =
+   unsafeFreeze a >>= scmEqual b . ScmVector
+
 scmEqual a b = scmEqv a b
 
 scmEquivalence :: (ScmValue -> ScmValue -> IO Bool) -> String
