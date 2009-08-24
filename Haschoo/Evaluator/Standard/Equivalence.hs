@@ -23,6 +23,12 @@ scmEq, scmEqv, scmEqual :: ScmValue -> ScmValue -> IO Bool
 scmEqv (ScmBool       a) (ScmBool       b) = return$ a == b
 scmEqv (ScmIdentifier a) (ScmIdentifier b) = return$ a == b
 scmEqv (ScmChar       a) (ScmChar       b) = return$ a == b
+scmEqv (ScmList       a) (ScmList       b) = ptrEq a b
+scmEqv (ScmString     a) (ScmString     b) = ptrEq a b
+scmEqv (ScmMString    a) (ScmMString    b) = ptrEq a b
+scmEqv (ScmVector     a) (ScmVector     b) = ptrEq a b
+scmEqv (ScmMVector    a) (ScmMVector    b) = ptrEq a b
+scmEqv (ScmPair     a b) (ScmPair     x y) = liftM2 (&&) (ptrEq a x) (ptrEq b y)
 scmEqv a b =
    if isNumeric a && isNumeric b
       then return$ isExact a == isExact b && numEq a b
