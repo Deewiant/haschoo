@@ -6,14 +6,14 @@ module Haschoo.Evaluator.Standard.Strings (procedures, isString, strToList)
 import Control.Applicative ((<$>))
 import Control.Arrow       ((&&&))
 import Control.Monad       (join, liftM2)
-import Data.Array.IArray   ((!), amap, bounds, elems)
+import Data.Array.IArray   ((!), bounds, elems)
 import Data.Array.IO       (IOUArray)
 import Data.Array.MArray   ( readArray, writeArray
                            , newArray, newArray_, newListArray
                            , getBounds, getElems
                            , freeze, thaw, unsafeFreeze, unsafeThaw)
 import Data.Array.Unboxed  (UArray)
-import Data.Char           (toLower)
+import Data.Char           (isLetter, toLower)
 import Data.Foldable       (foldrM)
 import Data.Function       (on)
 
@@ -35,17 +35,17 @@ procedures = map (\(a,b) -> (a, ScmFunc a b))
    , ("string-ref",  scmRef)
    , ("string-set!", scmSet)
 
-   , "string=?"  $< id &&& fmap (fmap ScmBool) .: scmCompare (==) id
-   , "string<?"  $< id &&& fmap (fmap ScmBool) .: scmCompare (<)  id
-   , "string>?"  $< id &&& fmap (fmap ScmBool) .: scmCompare (>)  id
-   , "string<=?" $< id &&& fmap (fmap ScmBool) .: scmCompare (<=) id
-   , "string>=?" $< id &&& fmap (fmap ScmBool) .: scmCompare (>=) id
+   , "string=?"  $< id &&& fmap (fmap ScmBool) .: scmCompare (==) (,)
+   , "string<?"  $< id &&& fmap (fmap ScmBool) .: scmCompare (<)  (,)
+   , "string>?"  $< id &&& fmap (fmap ScmBool) .: scmCompare (>)  (,)
+   , "string<=?" $< id &&& fmap (fmap ScmBool) .: scmCompare (<=) (,)
+   , "string>=?" $< id &&& fmap (fmap ScmBool) .: scmCompare (>=) (,)
 
-   , "string-ci=?"  $< id &&& fmap (fmap ScmBool) .: scmCompare (==) toLower
-   , "string-ci<?"  $< id &&& fmap (fmap ScmBool) .: scmCompare (<)  toLower
-   , "string-ci>?"  $< id &&& fmap (fmap ScmBool) .: scmCompare (>)  toLower
-   , "string-ci<=?" $< id &&& fmap (fmap ScmBool) .: scmCompare (<=) toLower
-   , "string-ci>=?" $< id &&& fmap (fmap ScmBool) .: scmCompare (>=) toLower
+   , "string-ci=?"  $< id &&& fmap (fmap ScmBool) .: scmCompare (==) lower
+   , "string-ci<?"  $< id &&& fmap (fmap ScmBool) .: scmCompare (<)  lower
+   , "string-ci>?"  $< id &&& fmap (fmap ScmBool) .: scmCompare (>)  lower
+   , "string-ci<=?" $< id &&& fmap (fmap ScmBool) .: scmCompare (<=) lower
+   , "string-ci>=?" $< id &&& fmap (fmap ScmBool) .: scmCompare (>=) lower
 
    , ("substring", scmSubstring)
 
@@ -57,6 +57,10 @@ procedures = map (\(a,b) -> (a, ScmFunc a b))
    , ("string-copy",  scmCopy)
    , ("string-fill!", scmFill)
    ]
+ where
+   lower a b = if isLetter a && isLetter b
+                  then (toLower a, toLower b)
+                  else (a,b)
 
 scmIsString :: [ScmValue] -> ErrOr Bool
 scmIsString [x] = Right (isString x)
@@ -117,12 +121,15 @@ scmSet [_, _, _]         = return$ notChar     "string-set!"
 scmSet (_:_:_:_)         = return$ tooManyArgs "string-set!"
 scmSet _                 = return$ tooFewArgs  "string-set!"
 
-scmCompare :: (UArray Int Char -> UArray Int Char -> Bool) -> (Char -> Char)
+scmCompare :: (String -> String -> Bool)
+           -> (Char -> Char -> (Char, Char))
            -> String
            -> [ScmValue] -> IO (ErrOr Bool)
 scmCompare p f s [a, b] =
    if isString a && isString b
-      then liftM2 (Right .: (p `on` amap f)) (conv a) (conv b)
+      then Right <$>
+              liftM2 (uncurry p .: unzip .: map (uncurry f) .: zip `on` elems)
+                     (conv a) (conv b)
       else return$ notString s
  where
    conv (ScmString  x) = return x

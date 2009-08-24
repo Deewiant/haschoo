@@ -4,8 +4,7 @@ module Haschoo.Evaluator.Standard.Characters (procedures) where
 
 import Control.Arrow ((&&&))
 import Data.Char     ( isAlpha, isDigit, isSpace, isLower, isUpper
-                     , toLower, toUpper)
-import Data.Function (on)
+                     , isLetter, toLower, toUpper)
 
 import Haschoo.Types           (ScmValue(..))
 import Haschoo.Utils           (ErrOr, ($<), (.:))
@@ -15,17 +14,17 @@ procedures :: [(String, ScmValue)]
 procedures = map (\(a,b) -> (a, ScmFunc a (return . b)))
    [ ("char?",  fmap ScmBool . scmIsChar)
 
-   , "char=?"  $< id &&& fmap ScmBool .: scmCompare (==) id
-   , "char<?"  $< id &&& fmap ScmBool .: scmCompare (<)  id
-   , "char>?"  $< id &&& fmap ScmBool .: scmCompare (>)  id
-   , "char<=?" $< id &&& fmap ScmBool .: scmCompare (<=) id
-   , "char>=?" $< id &&& fmap ScmBool .: scmCompare (>=) id
+   , "char=?"  $< id &&& fmap ScmBool .: scmCompare (==) (,)
+   , "char<?"  $< id &&& fmap ScmBool .: scmCompare (<)  (,)
+   , "char>?"  $< id &&& fmap ScmBool .: scmCompare (>)  (,)
+   , "char<=?" $< id &&& fmap ScmBool .: scmCompare (<=) (,)
+   , "char>=?" $< id &&& fmap ScmBool .: scmCompare (>=) (,)
 
-   , "char-ci=?"  $< id &&& fmap ScmBool .: scmCompare (==) toLower
-   , "char-ci<?"  $< id &&& fmap ScmBool .: scmCompare (<)  toLower
-   , "char-ci>?"  $< id &&& fmap ScmBool .: scmCompare (>)  toLower
-   , "char-ci<=?" $< id &&& fmap ScmBool .: scmCompare (<=) toLower
-   , "char-ci>=?" $< id &&& fmap ScmBool .: scmCompare (>=) toLower
+   , "char-ci=?"  $< id &&& fmap ScmBool .: scmCompare (==) lower
+   , "char-ci<?"  $< id &&& fmap ScmBool .: scmCompare (<)  lower
+   , "char-ci>?"  $< id &&& fmap ScmBool .: scmCompare (>)  lower
+   , "char-ci<=?" $< id &&& fmap ScmBool .: scmCompare (<=) lower
+   , "char-ci>=?" $< id &&& fmap ScmBool .: scmCompare (>=) lower
 
    , "char-alphabetic?" $< id &&& fmap ScmBool .: scmProperty isAlpha
    , "char-numeric?"    $< id &&& fmap ScmBool .: scmProperty isDigit
@@ -35,10 +34,14 @@ procedures = map (\(a,b) -> (a, ScmFunc a (return . b)))
 
    , ("char->integer", scmToInt)
    , ("integer->char", scmToChar)
-   
+
    , "char-upcase"   $< id &&& fmap ScmChar .: scmApply toUpper
    , "char-downcase" $< id &&& fmap ScmChar .: scmApply toLower
    ]
+ where
+   lower a b = if isLetter a && isLetter b
+                  then (toLower a, toLower b)
+                  else (a,b)
 
 scmIsChar :: [ScmValue] -> ErrOr Bool
 scmIsChar [ScmChar _] = Right True
@@ -46,9 +49,9 @@ scmIsChar [_]         = Right False
 scmIsChar []          = tooFewArgs  "char?"
 scmIsChar _           = tooManyArgs "char?"
 
-scmCompare :: (Char -> Char -> Bool) -> (Char -> Char) -> String
+scmCompare :: (Char -> Char -> Bool) -> (Char -> Char -> (Char,Char)) -> String
            -> [ScmValue] -> ErrOr Bool
-scmCompare p f _ [ScmChar a, ScmChar b] = Right $ (p `on` f) a b
+scmCompare p f _ [ScmChar a, ScmChar b] = Right . uncurry p $ f a b
 scmCompare _ _ s [_,_]                  = notChar     s
 scmCompare _ _ s (_:_:_)                = tooManyArgs s
 scmCompare _ _ s _                      = tooFewArgs  s
