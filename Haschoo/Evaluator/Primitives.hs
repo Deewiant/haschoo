@@ -3,9 +3,10 @@
 module Haschoo.Evaluator.Primitives (context) where
 
 import Control.Applicative ((<$>))
+import Control.Arrow       (first)
 import Control.Monad       (when)
 import Control.Monad.Error (throwError)
-import Control.Monad.State (get, put)
+import Control.Monad.State (get)
 import Control.Monad.Trans (liftIO)
 import Data.Array.IArray   (listArray, elems, bounds)
 import Data.IORef          ( IORef, readIORef
@@ -18,7 +19,7 @@ import Haschoo.Types            ( Haschoo, runHaschoo, withHaschoo
                                 , addToContext, contextLookup
                                 , listToPair)
 import Haschoo.Utils            ( compareLength, compareLengths, (.:)
-                                , fromRights)
+                                , fromRights, modifyM)
 import Haschoo.Evaluator.Eval   (eval, evalBody, maybeEval)
 import Haschoo.Evaluator.Macros (mkMacro)
 import Haschoo.Evaluator.Utils  (tooFewArgs, tooManyArgs)
@@ -38,7 +39,8 @@ primitives = map (\(a,b) -> (a, ScmPrim a b)) $
    , ("syntax-rules",  scmSyntaxRules)
    , ("let-syntax",    scmLetSyntax)
    , ("letrec-syntax", scmLetRecSyntax)
-   , ("quasiquote",    scmQuasiQuote) ]
+   , ("quasiquote",    scmQuasiQuote)
+   , ("do",            scmDo) ]
 
 scmLambda :: [ScmValue] -> Haschoo ScmValue
 scmLambda []                                          = tooFewArgs "lambda"
@@ -106,23 +108,9 @@ scmIf _       = tooFewArgs "if"
 
 scmSet :: [ScmValue] -> Haschoo ScmValue
 scmSet [ScmIdentifier var, expr] = do
-   e    <- eval expr
-   ctx  <- get
-   ctx' <- f e ctx
-   put ctx'
+   e  <- eval expr
+   set var e
    return ScmVoid
- where
-   f :: ScmValue -> [IORef Context] -> Haschoo [IORef Context]
-   f e (c:cs) = do
-      c' <- liftIO $ readIORef c
-      case contextLookup var c' of
-           Just _  -> do
-              liftIO $ modifyIORef c (addToContext var e)
-              return (c:cs)
-
-           Nothing -> fmap (c:) (f e cs)
-
-   f _ [] = throwError $ "Unbound identifier '" ++ var ++ "'"
 
 scmSet [_,_]   = throwError $ "Non-identifier argument to set!"
 scmSet (_:_:_) = tooManyArgs "set!"
@@ -410,3 +398,50 @@ scmQuasiQuote [expr] = finishUnqq <$> unqq 0 expr
 
 scmQuasiQuote [] = tooFewArgs  "quasiquote"
 scmQuasiQuote _  = tooManyArgs "quasiquote"
+
+scmDo :: [ScmValue] -> Haschoo ScmValue
+scmDo (ScmList vars@(_:_) : ScmList (test:result) : cmds) = do
+   inited <- mapM initVar vars
+   c' <- liftIO $ newIORef (mkContext $ map fst inited)
+   ctx <- get
+   withHaschoo (c':ctx) (go $ map (first fst) inited)
+ where
+   go :: [(String, ScmValue)] -> Haschoo ScmValue
+   go varSteps = do
+      stop <- eval test
+      if isTrue stop
+         then if null result then return ScmVoid else last <$> mapM eval result
+         else do
+            mapM_ eval cmds
+            evalSteps <- mapM (eval.snd) varSteps
+            mapM_ (uncurry set) $ zip (map fst varSteps) evalSteps
+            go varSteps
+
+   initVar :: ScmValue -> Haschoo ((String, ScmValue), ScmValue)
+   initVar (ScmList (var@(ScmIdentifier v) : i : step)) = do
+      step' <- case step of
+                    []  -> return var
+                    [s] -> return s
+                    _   -> throwError "do :: more than one step expression?"
+      ei <- eval i
+      return ((v, ei), step')
+
+   initVar _ = throwError "do :: expected list of variables and initializers"
+
+scmDo (_:_:_:_) = tooManyArgs "do"
+scmDo (_:_:_)   = throwError  "do :: empty lists or nonlists given"
+scmDo _         = tooFewArgs  "do"
+
+set :: String -> ScmValue -> Haschoo ()
+set var evaled = modifyM f
+ where
+   f (c:cs) = do
+      c' <- liftIO $ readIORef c
+      case contextLookup var c' of
+           Just _  -> do
+              liftIO $ modifyIORef c (addToContext var evaled)
+              return (c:cs)
+
+           Nothing -> (c:) <$> f cs
+
+   f [] = throwError $ "Unbound identifier '" ++ var ++ "'"
