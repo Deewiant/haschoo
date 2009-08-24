@@ -77,8 +77,9 @@ maybeEval :: ScmValue -> Haschoo (Maybe ScmValue)
 maybeEval = (`catchError` const (return Nothing)) . fmap Just . eval
 
 evalBody :: [ScmValue] -> Haschoo ScmValue
-evalBody (ScmList (ScmIdentifier "define":xs) : ds) =
-   scmDefine xs >> evalBody ds
+evalBody (ScmList (ScmIdentifier i : xs) : ds)
+   | i == "define" = scmDefine xs >> evalBody ds
+   | i == "begin"  = evalBody (xs ++ ds)
 
 evalBody ds@(_:_) = fmap last . mapM eval $ ds
 evalBody []       = return ScmVoid

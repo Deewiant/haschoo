@@ -27,13 +27,21 @@ import Haschoo.Evaluator.Utils  (tooFewArgs, tooManyArgs)
 -- Hence we need three eval functions (the following, evalBody, and eval) and
 -- hence definitions are handled separately in the former two instead of being
 -- ordinary primitives.
+--
+-- "begin" needs special treatment as well, since it depends on the evaluation
+-- level (R5RS 5.1, 5.2.2). We special-case it here and in evalBody, leaving
+-- ordinary expression usage to the definition given in R5RS 7.3.
 
 evalToplevel :: [IORef Context] -> [ScmValue] -> IO (ErrOr ScmValue)
 evalToplevel ctx prog = runHaschoo ctx (fmap last $ mapM f prog)
  where
-   f (ScmList (ScmIdentifier "define-syntax":xs)) = do
-      scmDefineSyntax xs
-      return ScmVoid
+   f (ScmList (ScmIdentifier i : xs))
+      | i == "define-syntax" = do
+         scmDefineSyntax xs
+         return ScmVoid
+
+      | i == "begin" = fmap last $ mapM f xs
+
    f d = evalBody [d]
 
 scmDefineSyntax :: [ScmValue] -> Haschoo ()
