@@ -5,7 +5,7 @@
 module Haschoo.Evaluator.Macros (mkMacro) where
 
 import Control.Applicative         ((<$>))
-import Control.Arrow               ((***), first)
+import Control.Arrow               (first)
 import Control.Monad               (liftM2, when)
 import Control.Monad.Error         (throwError)
 import Control.Monad.Loops         (andM, allM, firstM, untilM)
@@ -127,15 +127,16 @@ match1 lits (ScmList args) (ScmList ps) =
              lpat    = toList p
              paired  = concatMap (zip lpat . toList) ys
 
-             -- From then on it's quite trivial
-             matched = map    ((\(ScmIdentifier i) -> i) *** (:[]))
-                     . filter (isIdentifier . fst)
-                     $ paired
+             -- From then on it's quite trivial.
+             --
+             -- Just be sure to add an initial empty match for each identifier.
+             -- This ensures that patterns such as ((x) ...), when matched
+             -- against (), result in any x in the output being replaced with
+             -- nothing, instead of them not being seen as matches.
+             matched = [(i, [])  | ScmIdentifier i <- lpat]
+                    ++ [(i, [x]) | (ScmIdentifier i, x) <- paired]
 
           in tell . PM . TM.map Left $ TM.fromListWith (flip (++)) matched
-
-      isIdentifier (ScmIdentifier _) = True
-      isIdentifier _                 = False
 
 -- ... "P is an improper list (P1 ... Pn . Pm)" ...
 match1 lits args (ScmDottedList ps p) =
