@@ -5,6 +5,7 @@ module Haschoo.Evaluator.Standard.Equivalence
 
 import Control.Arrow     ((&&&))
 import Control.Monad     (liftM2)
+import Data.Array.IArray (elems)
 import Data.Array.MArray (getElems)
 
 import Haschoo.Types                      (ScmValue(..), pairToList)
@@ -60,6 +61,8 @@ scmEqual y@(ScmPair _ _) x@(ScmDottedList _ _) = scmEqual x y
 
 scmEqual (ScmString  a) (ScmString  b) = return$ a == b
 scmEqual (ScmMString a) (ScmMString b) = liftM2 (==) (getElems a) (getElems b)
+scmEqual (ScmString  a) (ScmMString b) = fmap (elems a==) $ getElems b
+scmEqual (ScmMString a) (ScmString  b) = fmap (==elems b) $ getElems a
 scmEqual a b = scmEqv a b
 
 scmEquivalence :: (ScmValue -> ScmValue -> IO Bool) -> String
