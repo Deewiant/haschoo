@@ -45,6 +45,9 @@ scmEq a b = if isNumeric a && isNumeric b
                then ptrEq  a b
                else scmEqv a b
 
+scmEqual x@(ScmPair _ _) y@(ScmPair _ _) =
+   join $ (liftM2 scmEqual `on` fmap (either id id) . pairToList) x y
+
 scmEqual (ScmList       x)   (ScmList       y)   = eqWithM scmEqual x y
 scmEqual (ScmDottedList x a) (ScmDottedList y b) = do
    ab <- scmEqual a b
