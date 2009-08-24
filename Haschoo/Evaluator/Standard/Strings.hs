@@ -9,7 +9,7 @@ import Control.Monad       (join, liftM2)
 import Data.Array.IArray   ((!), bounds, elems)
 import Data.Array.IO       (IOUArray)
 import Data.Array.MArray   ( readArray, writeArray
-                           , newArray, newArray_, newListArray
+                           , newArray, newListArray
                            , getBounds, getElems
                            , freeze, thaw, unsafeFreeze, unsafeThaw)
 import Data.Array.Unboxed  (UArray)
@@ -70,7 +70,7 @@ scmIsString _   = tooManyArgs "string?"
 scmMakeString, scmString :: [ScmValue] -> IO (ErrOr ScmValue)
 scmMakeString (ScmInt l : xs) =
    case xs of
-        []          -> f newArray_
+        []          -> f (flip newArray '*')
         [ScmChar c] -> f (flip newArray c)
         [_]         -> return$ notChar     "make-string"
         _           -> return$ tooManyArgs "make-string"
