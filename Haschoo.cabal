@@ -3,10 +3,10 @@ Cabal-Version: >= 1.6
 Name:        Haschoo
 Version:     0.0
 Homepage:    http://iki.fi/matti.niemenmaa/misc-projects.html#haschoo
-Synopsis:    R5RS Scheme interpreter
+Synopsis:    Minimalist R5RS Scheme interpreter
 Category:    Compilers/Interpreters
 Description:
-   Haschoo is a little R5RS interpreter written in Haskell for a university
+   Haschoo is a minimalist R5RS interpreter written in Haskell for a university
    course.
 
 Author:       Matti Niemenmaa
