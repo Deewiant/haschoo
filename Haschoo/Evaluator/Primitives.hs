@@ -82,8 +82,8 @@ mkΛ formals tailParams body = ScmFunc name . func <$> get
                              c' <- newIORef c
                              runHaschoo (c':ctx) $ evalBody body
 
-                          LT -> return duplicateParam
-                          GT -> error "lambda :: the impossible happened"
+                          GT -> return duplicateParam
+                          LT -> error "lambda :: the impossible happened"
 
               Nothing -> return badParam
 
