@@ -254,12 +254,12 @@ scmQuotRemMod _ s _       = tooFewArgs  s
 ---- gcd lcm
 
 scmGcd, scmLcm :: [ScmValue] -> ErrOr ScmValue
-scmGcd = scmGcdLcm gcd "gcd"
-scmLcm = scmGcdLcm lcm "lcm"
+scmGcd = scmGcdLcm (\a b -> if a == 0 && b == 0 then 0 else gcd a b) 0 "gcd"
+scmLcm = scmGcdLcm lcm 1 "lcm"
 
-scmGcdLcm :: (Integer -> Integer -> Integer) -> String
+scmGcdLcm :: (Integer -> Integer -> Integer) -> Integer -> String
           -> [ScmValue] -> ErrOr ScmValue
-scmGcdLcm f s = fmap fin . foldM go (True,0)
+scmGcdLcm f i s = fmap fin . foldM go (True,i)
  where
    go  (exact, n) = fmap ((exact &&) *** f n) . asInt s
    fin (exact, n) = if exact then ScmInt n else ScmReal (fromInteger n)
