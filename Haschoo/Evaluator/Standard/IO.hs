@@ -3,6 +3,7 @@
 module Haschoo.Evaluator.Standard.IO (procedures) where
 
 import Control.Arrow     ((&&&))
+import Control.Exception (bracket)
 import Control.Monad     (liftM2)
 import Data.Array.IArray (elems)
 import Data.Array.MArray (getElems)
@@ -75,7 +76,7 @@ scmCallWithFile :: IOMode -> (Handle -> ScmValue) -> String
                 -> [ScmValue] -> IO (ErrOr ScmValue)
 scmCallWithFile mode toPort _ [s, ScmFunc _ f] | isString s = do
    path <- strToList s
-   f . return . toPort =<< openFile path mode
+   bracket (openFile path mode) hClose (f . (:[]) . toPort)
 
 scmCallWithFile _ _ s [_, ScmFunc _ _] = return$ notString    s
 scmCallWithFile _ _ s [_,_]            = return$ notProcedure s
