@@ -297,7 +297,8 @@ scmGenericRound :: (forall a. RealFrac a => a -> Integer) -> String
 scmGenericRound _ _ [ScmInt     x] = Right . ScmInt                $ x
 scmGenericRound f _ [ScmRat     x] = Right . ScmInt                $ f x
 scmGenericRound f _ [ScmReal    x] = Right . ScmReal . fromInteger $ f x
-scmGenericRound _ s [_]            = notReal s
+scmGenericRound _ s [ScmComplex _] = notReal s
+scmGenericRound _ s [_]            = notNum s
 scmGenericRound _ s []             = tooFewArgs s
 scmGenericRound _ s _              = tooManyArgs s
 
