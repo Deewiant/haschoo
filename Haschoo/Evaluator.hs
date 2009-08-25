@@ -32,8 +32,8 @@ import Haschoo.Evaluator.Utils  (tooFewArgs, tooManyArgs)
 -- level (R5RS 5.1, 5.2.2). We special-case it here and in evalBody, leaving
 -- ordinary expression usage to the definition given in R5RS 7.3.
 
-evalToplevel :: [IORef Context] -> [ScmValue] -> IO (ErrOr ScmValue)
-evalToplevel ctx prog = runHaschoo ctx (fmap last $ mapM f prog)
+evalToplevel :: [IORef Context] -> ScmValue -> IO (ErrOr ScmValue)
+evalToplevel ctx = runHaschoo ctx . f
  where
    f (ScmList (ScmIdentifier i : xs))
       | i == "define-syntax" = do

@@ -1,15 +1,15 @@
 -- File created: 2009-07-11 20:29:49
 
-module Haschoo.Parser (runParser, program, value, number) where
+module Haschoo.Parser (runParser, programValue, value, number) where
 
-import Control.Applicative           ((<$>))
-import Control.Arrow                 (first)
-import Control.Monad                 (liftM2)
-import Data.Char                     (digitToInt, toLower)
-import Data.Complex                  (Complex((:+)), mkPolar)
-import Data.Maybe                    (fromJust, fromMaybe, isJust)
-import Data.Ratio                    ((%))
-import Numeric                       (readInt)
+import Control.Applicative                  ((<$>))
+import Control.Arrow                        (first)
+import Control.Monad                        (liftM2)
+import Data.Char                            (digitToInt, toLower)
+import Data.Complex                         (Complex((:+)), mkPolar)
+import Data.Maybe                           (fromJust, fromMaybe, isJust)
+import Data.Ratio                           ((%))
+import Numeric                              (readInt)
 import Text.ParserCombinators.Parsec hiding (runParser)
 
 import Haschoo.Types (ScmValue(..), toScmString, toScmVector)
@@ -18,8 +18,14 @@ import Haschoo.Utils (void, (.:))
 runParser :: Parser a -> SourceName -> String -> Either String a
 runParser = (either (Left . show) Right .:) . parse
 
-program :: Parser [ScmValue]
-program = values `discard` eof
+programValue :: Maybe SourcePos -> Parser (Maybe (ScmValue, String, SourcePos))
+programValue pos = do
+   maybe (return ()) setPosition pos
+   optional atmosphere
+   v <- (Just <$> value) <|> (eof >> return Nothing)
+   case v of
+        Nothing -> return Nothing
+        Just v' -> liftM2 (Just .: (,,) v') getInput getPosition
 
 values :: Parser [ScmValue]
 values = optional atmosphere >> (many $ value `discard` atmosphere)

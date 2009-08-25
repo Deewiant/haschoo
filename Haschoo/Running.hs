@@ -11,7 +11,7 @@ import Data.Typeable     (Typeable)
 import System.IO         (Handle, openFile, IOMode(ReadMode), hGetContents)
 
 import Haschoo.Evaluator (evalToplevel)
-import Haschoo.Parser    (runParser, program)
+import Haschoo.Parser    (runParser, programValue)
 import Haschoo.Types     (Context)
 
 data RunError = ParseError String | RuntimeError String
@@ -30,11 +30,15 @@ runHandle :: [IORef Context] -> FilePath -> Handle -> IO ()
 runHandle ctx name = hGetContents >=> run ctx name
 
 run :: [IORef Context] -> FilePath -> String -> IO ()
-run ctx name str =
-   case runParser program name str of
-        Left  e -> throw (ParseError e)
-        Right p -> do
-           result <- evalToplevel ctx p
-           case result of
-                Left  e -> throw (RuntimeError e)
-                Right _ -> return ()
+run ctx name = go Nothing
+ where
+   go pos str = do
+      case runParser (programValue pos) name str of
+           Left e               -> throw (ParseError e)
+           Right (Just (v,s,p)) -> do
+              result <- evalToplevel ctx v
+              case result of
+                   Left  e -> throw (RuntimeError e)
+                   Right _ -> go (Just p) s
+
+           Right Nothing -> return ()
