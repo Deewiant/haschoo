@@ -407,7 +407,7 @@ scmAngle    = scmComplexPart phase     (Right . angle)        "angle"
    angle (ScmInt  n) = f ScmInt  n
    angle _           = error "angle :: the impossible happened"
 
-   f c n = if n >= 0 then c n else ScmReal (-pi/2)
+   f c n = if n >= 0 then c 0 else ScmReal pi
 
 scmComplexPart :: (Complex Double -> Double)
                -> (ScmValue -> ErrOr ScmValue)
