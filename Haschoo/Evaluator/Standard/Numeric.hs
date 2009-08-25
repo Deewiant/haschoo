@@ -454,7 +454,8 @@ scmToString (x:xs) | isNumeric x =
         [ScmInt radix] ->
            if radix `elem` [2,8,10,16]
               then g x (fromInteger radix)
-              else return$ fail "number->string :: invalid radix"
+              else return. fail $
+                      "number->string :: invalid radix " ++ show radix
 
         [_] -> return$ notInt      "number->string"
         _   -> return$ tooManyArgs "number->string"
@@ -498,9 +499,11 @@ toNumHelper :: [ScmValue] -> String -> ErrOr ScmValue
 toNumHelper xs s =
    case xs of
         []             -> Right $ f s 10
-        [ScmInt radix] -> if radix `elem` [2,8,10,16]
-                             then Right $ f s (fromInteger radix)
-                             else fail "string->number :: invalid radix"
+        [ScmInt radix] ->
+           if radix `elem` [2,8,10,16]
+              then Right $ f s (fromInteger radix)
+              else fail $ "string->number :: invalid radix " ++ show radix
+
         [_]            -> notInt       "string->number"
         _              -> tooManyArgs  "string->number"
  where
