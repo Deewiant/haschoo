@@ -60,8 +60,8 @@ scmForEach (ScmFunc _ f : args@(_:_)) = do
    err <- scmIterate "for-each" () (\_ _ -> ()) f args
    return$ either Left (const $ Right ScmVoid) err
 
-scmForEach (_:_) = return$ notProcedure "for-each"
-scmForEach _     = return$ tooFewArgs   "for-each"
+scmForEach (_:_:_) = return$ notProcedure "for-each"
+scmForEach _       = return$ tooFewArgs   "for-each"
 
 scmIterate :: forall a. String -> a -> (ScmValue -> a -> a)
            -> ([ScmValue] -> IO (ErrOr ScmValue))
