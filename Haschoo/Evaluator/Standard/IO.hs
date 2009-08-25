@@ -11,9 +11,7 @@ import System.IO         ( Handle, IOMode(..), stdin, stdout
                          , hGetChar, hLookAhead, hReady
                          , hPutStr, hPutStrLn, hPutChar)
 
-import Text.ParserCombinators.Poly.Plain (runParser)
-
-import Haschoo.Parser          (value)
+import Haschoo.Parser          (runParser, value)
 import Haschoo.Types           ( ScmValue(..), scmShow, scmShowWith
                                , isAggregate)
 import Haschoo.Utils           (ErrOr, ($<), (.:))
@@ -123,7 +121,7 @@ scmRead hdl = go []
          else do
             c <- hGetChar hdl
             let s' = s ++ [c]
-            either (const $ go s') return (fst $ runParser value s')
+            either (const $ go s') return (runParser value s')
 
 scmReadChar, scmPeekChar, scmCharReady :: Handle -> IO ScmValue
 scmReadChar  = fmap ScmChar . hGetChar

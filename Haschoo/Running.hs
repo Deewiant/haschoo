@@ -10,10 +10,8 @@ import Data.IORef        (IORef)
 import Data.Typeable     (Typeable)
 import System.IO         (Handle, openFile, IOMode(ReadMode), hGetContents)
 
-import Text.ParserCombinators.Poly.Plain (runParser)
-
 import Haschoo.Evaluator (evalToplevel)
-import Haschoo.Parser    (program)
+import Haschoo.Parser    (runParser, program)
 import Haschoo.Types     (Context)
 
 data RunError = ParseError String | RuntimeError String
@@ -33,7 +31,7 @@ runHandle ctx = hGetContents >=> run ctx
 
 run :: [IORef Context] -> String -> IO ()
 run ctx str =
-   case fst $ runParser program str of
+   case runParser program str of
         Left  e -> throw (ParseError e)
         Right p -> do
            result <- evalToplevel ctx p

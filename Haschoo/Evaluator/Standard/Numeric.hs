@@ -15,7 +15,6 @@ import Data.Complex      ( Complex((:+)), mkPolar
 import Data.Ratio        (numerator, denominator, approxRational)
 import Data.Function     (on)
 import Numeric           (showIntAtBase, showSigned)
-import Text.ParserCombinators.Poly.Plain (runParser)
 
 import qualified Haschoo.Parser as Parser
 import           Haschoo.Types           (ScmValue(..), toScmMString)
@@ -491,10 +490,9 @@ toNumHelper xs s =
         _              -> tooManyArgs  "string->number"
  where
    f str radix =
-      let (mn,_) = runParser (Parser.number radix) str
-       in case mn of
-               Right n | isNumeric n -> n
-               _                     -> ScmBool False
+       case Parser.runParser (Parser.number radix) str of
+            Right n | isNumeric n -> n
+            _                     -> ScmBool False
 
 -------------
 

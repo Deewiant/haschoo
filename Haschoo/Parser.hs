@@ -1,6 +1,6 @@
 -- File created: 2009-07-11 20:29:49
 
-module Haschoo.Parser (program, value, number) where
+module Haschoo.Parser (runParser, program, value, number) where
 
 import Control.Applicative ((<$>))
 import Control.Monad       (join)
@@ -14,8 +14,13 @@ import Text.ParserCombinators.Poly.Plain
    ( Parser, next, apply, satisfy, discard, commit, adjustErr, onFail, reparse
    , many, many1, oneOf, oneOf', bracket, indent, optional)
 
+import qualified Text.ParserCombinators.Poly.Plain as P
+
 import Haschoo.Types (ScmValue(..), toScmString, toScmVector)
-import Haschoo.Utils (void)
+import Haschoo.Utils (void, (.:))
+
+runParser :: Parser Char a -> String -> Either String a
+runParser = fst .: P.runParser
 
 program :: Parser Char [ScmValue]
 program = values `discard` eof
