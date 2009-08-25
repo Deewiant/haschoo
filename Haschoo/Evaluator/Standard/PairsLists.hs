@@ -186,7 +186,8 @@ scmLength _             = return$ tooManyArgs "length"
 --- append
 
 scmAppend :: [ScmValue] -> IO (ErrOr ScmValue)
-scmAppend args@(_:_) = foldrM fold (Left "") args
+scmAppend []   = Right . fst <$> listToPair []
+scmAppend args = foldrM fold (Left "") args
  where
    -- The last argument is allowed to be a nonlist: this is a bit of a hack to
    -- catch that case
@@ -224,8 +225,6 @@ scmAppend args@(_:_) = foldrM fold (Left "") args
    go rhs x@(ScmPair _ _) = next rhs x
    go rhs x@(ScmList _)   = f x rhs
    go _   _               = return$ notList "append"
-
-scmAppend [] = return$ tooFewArgs "append"
 
 --- reverse
 
