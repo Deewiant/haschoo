@@ -220,7 +220,7 @@ number defRadix = do
          (try . choice) [ do char '.'
                              n <- many1 (digitN 10)
                              skipMany (char '#')
-                             return . ScmReal $ readPostDecimal n
+                             return . ScmReal $ readDecimal "0" n
 
                         , do a <- many1 (digitN 10)
                              char '.'
@@ -272,12 +272,8 @@ number defRadix = do
    readInteger radix =
       fst.head . readInt (fromIntegral radix) (const True) digitToInt
 
-   readPostDecimal :: String -> Double
-   readPostDecimal [] = 0
-   readPostDecimal xs = fromInteger (readInteger 10 xs) / (10 ^ length xs)
-
    readDecimal :: String -> String -> Double
-   readDecimal as bs = fromInteger (readInteger 10 as) + readPostDecimal bs
+   readDecimal as bs = read . concat $ [as, ".", bs]
 
 -- Pushes back anything relevant for other parsers
 delimiter :: Parser ()
