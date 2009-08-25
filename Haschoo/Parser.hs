@@ -125,8 +125,8 @@ number :: Int -> Parser ScmValue
 number defRadix = do
    (radix,exact) <- try prefix
 
-   let gotPrefix = isJust radix || isJust exact
-   n <- (if gotPrefix then id else try) $ complex (fromMaybe defRadix radix)
+   let p = if isJust radix || isJust exact then id else try
+   n <- p $ complex (fromMaybe False exact) (fromMaybe defRadix radix)
 
    delimiter
 
@@ -152,18 +152,18 @@ number defRadix = do
          let xs' = map (first toLower) xs ++ xs
          fromJust . (`lookup` xs') <$> oneOf (map fst xs')
 
-   complex radix =
-      choice [ try $ do n <- sreal radix
+   complex exact radix =
+      choice [ try $ do n <- sreal False radix
                         ncChar 'i'
                         return (mkImaginary n)
 
-             , try $ do a  <- real radix
+             , try $ do a  <- real exact radix
                         at <- optionMaybe (char '@')
                         if isJust at
-                           then mkComplex mkPolar a <$> real radix
+                           then mkComplex mkPolar a <$> real False radix
                            else do
                               b <- optionMaybe $ try imaginaryUnit <|>
-                                      do n <- sreal radix
+                                      do n <- sreal False radix
                                          ncChar 'i'
                                          return n
 
@@ -186,47 +186,47 @@ number defRadix = do
    toDouble (ScmReal r) = r
    toDouble _           = error "number.toDouble :: internal error"
 
-   real radix = do
+   real exact radix = do
       neg <- optionMaybe sign
-      applySign (fromMaybe 1 neg) <$> ureal radix
+      applySign (fromMaybe 1 neg) <$> ureal exact radix
 
-   sreal radix = do
+   sreal exact radix = do
       neg <- sign
-      applySign neg <$> ureal radix
+      applySign neg <$> ureal exact radix
 
    applySign neg (ScmInt  n) = ScmInt  (fromIntegral neg * n)
    applySign neg (ScmRat  n) = ScmRat  (fromIntegral neg * n)
    applySign neg (ScmReal n) = ScmReal (fromIntegral neg * n)
    applySign _   _           = error "number.applySign :: іnternal error"
 
-   ureal radix = choice [ string "nan.#" >> return (ScmReal $ 0/0)
-                        , string "inf.#" >> return (ScmReal $ 1/0)
-                        , decimal radix
-                        , do a <- uint radix
-                             b <- optionMaybe $ char '/' >> uint radix
-                             case b of
-                                  Nothing ->
-                                     if radix == 10
-                                        then tryExponent a
-                                        else return a
-                                  Just n  -> return (mkRatio a n) ]
+   ureal exact radix = choice [ string "nan.#" >> return (ScmReal $ 0/0)
+                              , string "inf.#" >> return (ScmReal $ 1/0)
+                              , decimal exact radix
+                              , do a <- uint radix
+                                   b <- optionMaybe $ char '/' >> uint radix
+                                   case b of
+                                        Nothing ->
+                                           if radix == 10
+                                              then tryExponent a
+                                              else return a
+                                        Just n  -> return (mkRatio a n) ]
 
    mkRatio (ScmInt a) (ScmInt b) = ScmRat (a % b)
    mkRatio _          _          = error "number.mkRatio :: internal error"
 
-   decimal radix | radix /= 10 = fail "Decimal outside radix 10"
-                 | otherwise   =
+   decimal exact radix | radix /= 10 = fail "Decimal outside radix 10"
+                       | otherwise   =
       tryExponent =<<
          (try . choice) [ do char '.'
                              n <- many1 (digitN 10)
                              skipMany (char '#')
-                             return . ScmReal $ readDecimal "0" n
+                             return $ readDecimal exact "0" n
 
                         , do a <- many1 (digitN 10)
                              char '.'
                              b <- many (digitN 10)
                              skipMany (char '#')
-                             return . ScmReal $ readDecimal a b
+                             return $ readDecimal exact a b
 
                         , do n <- many1 (digitN 10)
                              hashes  <- map (const '0') <$> many1 (char '#')
@@ -272,8 +272,11 @@ number defRadix = do
    readInteger radix =
       fst.head . readInt (fromIntegral radix) (const True) digitToInt
 
-   readDecimal :: String -> String -> Double
-   readDecimal as bs = read . concat $ [as, ".", bs]
+   readDecimal :: Bool -> String -> String -> ScmValue
+   readDecimal False as bs = ScmReal . read . concat $ [as, ".", bs]
+   readDecimal True  as bs =
+      ScmRat $ fromInteger (readInteger 10 as)
+             + fromInteger (readInteger 10 bs) / 10 ^ length bs
 
 -- Pushes back anything relevant for other parsers
 delimiter :: Parser ()
