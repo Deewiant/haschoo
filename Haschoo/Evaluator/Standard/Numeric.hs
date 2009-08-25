@@ -294,10 +294,13 @@ scmRound = scmGenericRound round    "round"
 
 scmGenericRound :: (forall a. RealFrac a => a -> Integer) -> String
                 -> [ScmValue] -> ErrOr ScmValue
-scmGenericRound _ _ [ScmInt     x] = Right . ScmInt                $ x
-scmGenericRound f _ [ScmRat     x] = Right . ScmInt                $ f x
-scmGenericRound f _ [ScmReal    x] = Right . ScmReal . fromInteger $ f x
-scmGenericRound _ s [ScmComplex _] = notReal s
+scmGenericRound _ _ [   ScmInt     x]  = Right . ScmInt                $ x
+scmGenericRound f _ [   ScmRat     x]  = Right . ScmInt                $ f x
+scmGenericRound f _ [   ScmReal    x]  = Right . ScmReal . fromInteger $ f x
+scmGenericRound _ s [n@(ScmComplex _)] =
+   case asInt s n of
+        Right (_,x) -> Right . ScmInt $ x
+        Left _      -> notReal s
 scmGenericRound _ s [_]            = notNum s
 scmGenericRound _ s []             = tooFewArgs s
 scmGenericRound _ s _              = tooManyArgs s
