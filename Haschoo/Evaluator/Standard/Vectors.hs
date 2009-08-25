@@ -9,6 +9,7 @@ import Data.Array.IO       (IOArray)
 import Data.Array.MArray   ( readArray, writeArray
                            , newArray, newListArray
                            , getBounds, getElems)
+import Data.Complex        (Complex((:+)))
 
 import Haschoo.Types           (ScmValue(..), listToPair, pairToList)
 import Haschoo.Utils           (ErrOr)
@@ -43,7 +44,7 @@ scmIsVector _              = tooManyArgs "vector?"
 scmMakeVector, scmVector :: [ScmValue] -> IO (ErrOr ScmValue)
 scmMakeVector (ScmInt l : xs) =
    case xs of
-        []  -> f (flip newArray ScmVoid)
+        []  -> f (flip newArray (ScmComplex $ 0 :+ 42))
         [x] -> f (flip newArray x)
         _   -> return$ tooManyArgs "make-vector"
  where
