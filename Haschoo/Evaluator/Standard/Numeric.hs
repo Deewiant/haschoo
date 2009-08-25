@@ -104,10 +104,9 @@ scmIsNumber [x] = Right $ isNumeric x
 scmIsNumber []  = tooFewArgs  "number?"
 scmIsNumber _   = tooManyArgs "number?"
 
-scmIsReal [ScmComplex (_ :+ b)] = Right $ b == 0
-scmIsReal [x]                   = Right $ isNumeric x
-scmIsReal []                    = tooFewArgs  "real?"
-scmIsReal _                     = tooManyArgs "real?"
+scmIsReal [x] = Right $ isReal x
+scmIsReal []  = tooFewArgs  "real?"
+scmIsReal _   = tooManyArgs "real?"
 
 scmIsRational [ScmRat _] = Right True
 scmIsRational [x]        = Right $ isInteger x
@@ -230,9 +229,9 @@ scmDiv (x:xs) =
 
 scmAbs :: [ScmValue] -> ErrOr ScmValue
 scmAbs [x] =
-   if isNumeric x
+   if isReal x
       then liftScmNum abs x
-      else notNum "abs"
+      else notReal "abs"
 scmAbs [] = tooFewArgs  "abs"
 scmAbs _  = tooManyArgs "abs"
 
@@ -517,7 +516,7 @@ notNum  = fail . ("Nonnumeric argument to " ++)
 notReal = fail . ("Nonreal argument to " ++)
 notRat  = fail . ("Nonrational argument to " ++)
 
-isNumeric, isInteger :: ScmValue -> Bool
+isNumeric, isInteger, isReal :: ScmValue -> Bool
 isNumeric (ScmInt     _) = True
 isNumeric (ScmRat     _) = True
 isNumeric (ScmReal    _) = True
@@ -529,6 +528,9 @@ isInteger (ScmRat     x)      = denominator x == 1
 isInteger (ScmReal    x)      = x == fromInteger (round x)
 isInteger (ScmComplex (a:+b)) = b == 0 && a == fromInteger (round a)
 isInteger _                   = False
+
+isReal (ScmComplex (_ :+ b)) = b == 0
+isReal x                     = isNumeric x
 
 asInt :: String -> ScmValue -> ErrOr (Bool, Integer)
 asInt s x | not (isInteger x) = notInt s
