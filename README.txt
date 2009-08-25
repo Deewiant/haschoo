@@ -11,9 +11,10 @@ For licensing information, see LICENSE.txt.
 Usage
 -----
 
-Haschoo doesn't understand any command line options: if given no parameters, it
-becomes a REPL which terminates on end-of-file, otherwise it runs the file
-named by each argument as a standalone Scheme program.
+Haschoo is quite spartan. It doesn't understand any command line options: if
+given no parameters, it becomes a REPL which terminates on end-of-file,
+otherwise it runs the file named by each argument as a standalone Scheme
+program.
 
 Building
 --------
@@ -27,10 +28,21 @@ Nowadays you can also try the Haskell Platform, intended as a simple installer
 to get you started quickly: http://hackage.haskell.org/platform/
 
 If you have the cabal-install tool installed ([2] or the Haskell Platform),
-installing Haschoo should be as simple as 'cabal install Haschoo'. If not, the
-following command, run from Haschoo's root directory, should also work:
+installing Haschoo should be as simple as:
 
-ghc --make Haschoo/Driver.hs -o haschoo -main-is Haschoo.Driver -O2
+cabal configure
+cabal build
+cabal install
+
+Or, for some reason, if you don't have Haschoo downloaded already, you should
+be able to get the same results by doing:
+
+cabal install Haschoo
+
+If you don't have cabal-install, the following command, run from Haschoo's root
+directory, should also work:
+
+ghc --make Haschoo/Main.hs -o haschoo -O2
 
 Goal
 ----
