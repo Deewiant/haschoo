@@ -110,7 +110,7 @@ scmIsReal []                    = tooFewArgs  "real?"
 scmIsReal _                     = tooManyArgs "real?"
 
 scmIsRational [ScmRat _] = Right True
-scmIsRational [_]        = Right False
+scmIsRational [x]        = Right $ isInteger x
 scmIsRational []         = tooFewArgs "rational?"
 scmIsRational _          = tooManyArgs "rational?"
 
@@ -391,18 +391,20 @@ scmMakeComplex _ s (_:_:_) = tooManyArgs s
 scmMakeComplex _ s _       = tooFewArgs  s
 
 scmRealPart, scmImagPart, scmNorm, scmAngle :: [ScmValue] -> ErrOr ScmValue
-scmRealPart = scmComplexPart realPart  "real-part"
-scmImagPart = scmComplexPart imagPart  "imag-part"
-scmNorm     = scmComplexPart magnitude "magnitude"
-scmAngle    = scmComplexPart phase     "angle"
+scmRealPart = scmComplexPart realPart  id        "real-part"
+scmImagPart = scmComplexPart imagPart  (const 0) "imag-part"
+scmNorm     = scmComplexPart magnitude id        "magnitude"
+scmAngle    = scmComplexPart phase     (const 0) "angle"
 
-scmComplexPart :: (Complex Double -> Double) -> String
+scmComplexPart :: (Complex Double -> Double)
+               -> (forall n. Num n => n -> n)
+               -> String
                -> [ScmValue] -> ErrOr ScmValue
-scmComplexPart f _ [ScmComplex x]    = Right $ ScmReal (f x)
-scmComplexPart _ _ [x] | isNumeric x = Right x
-scmComplexPart _ s [_]               = notNum s
-scmComplexPart _ s []                = tooFewArgs s
-scmComplexPart _ s _                 = tooManyArgs s
+scmComplexPart f _ _ [ScmComplex x]    = Right $ ScmReal (f x)
+scmComplexPart _ g _ [x] | isNumeric x = liftScmNum g x
+scmComplexPart _ _ s [_]               = notNum s
+scmComplexPart _ _ s []                = tooFewArgs s
+scmComplexPart _ _ s _                 = tooManyArgs s
 
 ---- exact->inexact inexact->exact
 
