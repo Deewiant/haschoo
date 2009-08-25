@@ -31,6 +31,9 @@ scmEqv (ScmString     a) (ScmString     b) = ptrEq a b
 scmEqv (ScmMString    a) (ScmMString    b) = ptrEq a b
 scmEqv (ScmVector     a) (ScmVector     b) = ptrEq a b
 scmEqv (ScmMVector    a) (ScmMVector    b) = ptrEq a b
+scmEqv (ScmFunc  _    a) (ScmFunc  _    b) = ptrEq a b
+scmEqv (ScmPrim  _    a) (ScmPrim  _    b) = ptrEq a b
+scmEqv (ScmMacro _    a) (ScmMacro _    b) = ptrEq a b
 
 scmEqv (ScmDottedList a b) (ScmDottedList x y) =
    liftM2 (&&) (ptrEq a x) (ptrEq b y)
