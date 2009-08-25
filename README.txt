@@ -28,19 +28,24 @@ Nowadays you can also try the Haskell Platform, intended as a simple installer
 to get you started quickly: http://hackage.haskell.org/platform/
 
 If you have the cabal-install tool installed ([2] or the Haskell Platform),
-installing Haschoo should be as simple as:
+installing Haschoo without downloading it manually should be as simple as:
+
+cabal install Haschoo
+
+If you've already got Haschoo downloaded, and you have cabal-install, try:
 
 cabal configure
 cabal build
 cabal install
 
-Or, for some reason, if you don't have Haschoo downloaded already, you should
-be able to get the same results by doing:
-
-cabal install Haschoo
-
-If you don't have cabal-install, the following command, run from Haschoo's root
+If you don't have cabal-install, the following commands, run from Haschoo's root
 directory, should also work:
+
+runhaskell Setup.hs configure
+runhaskell Setup.hs build
+runhaskell Setup.hs install
+
+As a last resort:
 
 ghc --make Haschoo/Main.hs -o haschoo -O2
 
