@@ -358,7 +358,10 @@ scmExpt :: [ScmValue] -> ErrOr ScmValue
 scmExpt [x,y] =
    case pairScmComplex x y of
         Left _                              -> notNum "expt"
-        Right (ScmInt     a, ScmInt      b) -> Right . ScmInt     $ a ^ b
+        Right (ScmInt     a, ScmInt      b) ->
+           if b < 0
+              then Right . ScmReal $ fromInteger a ^^ b
+              else Right . ScmInt  $ a ^ b
         Right (ScmReal    a, ScmReal     b) -> Right . ScmReal    $ a ** b
         Right (ScmComplex a, ScmComplex  b) -> Right . ScmComplex $ a ** b
         Right (ScmRat     a, ScmRat      b) ->
