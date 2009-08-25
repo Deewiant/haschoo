@@ -17,6 +17,10 @@ License-File: LICENSE.txt
 Build-Type: Simple
 
 Extra-Source-Files: README.txt
+                    tests/*.scm
+                    tests/macros/*.scm
+                    tests/macros/r5rs/*.scm
+                    tests/macros/xfail/*.scm
 
 Executable haschoo
    Main-Is: Haschoo/Main.hs
