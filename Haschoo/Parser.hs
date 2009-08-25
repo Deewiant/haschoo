@@ -109,8 +109,12 @@ list =
                   end <- value
                   return$ case end of
                                ScmList l -> ScmList (vals ++ l)
-                               _         -> ScmDottedList vals end
+                               _         -> mkDotted vals end
                else return$ ScmList vals
+ where
+   -- Flatten (1 . (2 . 3)) to (1 2 . 3)
+   mkDotted xs (ScmDottedList ys z) = mkDotted (xs ++ ys) z
+   mkDotted xs x                    = ScmDottedList xs x
 
 vector :: Parser ScmValue
 vector = do
