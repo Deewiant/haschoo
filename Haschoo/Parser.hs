@@ -226,7 +226,10 @@ number defRadix = do
                              char '.'
                              b <- many (digitN 10)
                              skipMany (char '#')
-                             return $ readDecimal exact a b
+                             -- read doesn't like "123." so add a 0 if
+                             -- necessary
+                             return $
+                                readDecimal exact a (if null b then "0" else b)
 
                         , do n <- many1 (digitN 10)
                              hashes  <- map (const '0') <$> many1 (char '#')
