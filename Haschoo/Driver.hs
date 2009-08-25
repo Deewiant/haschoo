@@ -18,7 +18,7 @@ main = do
    ctx  <- toplevelContext
    args <- getArgs
    if null args
-      then runHandle ctx stdin
+      then runHandle ctx "<stdin>" stdin
       else do
          initCtx <- mapM readIORef ctx
          mapM_ (\f -> do
@@ -29,4 +29,4 @@ main = do
 
 -- For GHCi use
 runOne :: String -> IO ()
-runOne s = toplevelContext >>= void . flip run s
+runOne s = toplevelContext >>= \ctx -> void (run ctx "runOne" s)

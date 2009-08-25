@@ -2,44 +2,44 @@
 
 module Haschoo.Parser (runParser, program, value, number) where
 
-import Control.Applicative ((<$>))
-import Control.Monad       (join)
-import Data.Char           ( isDigit, isHexDigit, isOctDigit, isSpace
-                           , digitToInt, toLower)
-import Data.Complex        (Complex((:+)), mkPolar)
-import Data.Maybe          (fromJust, fromMaybe, isJust)
-import Data.Ratio          ((%))
-import Numeric             (readInt)
-import Text.ParserCombinators.Poly.Plain
-   ( Parser, next, apply, satisfy, discard, commit, adjustErr, onFail, reparse
-   , many, many1, oneOf, oneOf', bracket, indent, optional)
-
-import qualified Text.ParserCombinators.Poly.Plain as P
+import Control.Applicative           ((<$>))
+import Control.Arrow                 (first)
+import Control.Monad                 (liftM2)
+import Data.Char                     (digitToInt, toLower)
+import Data.Complex                  (Complex((:+)), mkPolar)
+import Data.Maybe                    (fromJust, fromMaybe, isJust)
+import Data.Ratio                    ((%))
+import Numeric                       (readInt)
+import Text.ParserCombinators.Parsec hiding (runParser)
 
 import Haschoo.Types (ScmValue(..), toScmString, toScmVector)
 import Haschoo.Utils (void, (.:))
 
-runParser :: Parser Char a -> String -> Either String a
-runParser = fst .: P.runParser
+runParser :: Parser a -> SourceName -> String -> Either String a
+runParser = (either (Left . show) Right .:) . parse
 
-program :: Parser Char [ScmValue]
+program :: Parser [ScmValue]
 program = values `discard` eof
 
-values :: Parser Char [ScmValue]
-values = atmosphere >> (commit . many $ value `discard` commit atmosphere)
+values :: Parser [ScmValue]
+values = optional atmosphere >> (many $ value `discard` atmosphere)
 
-value :: Parser Char ScmValue
+value :: Parser ScmValue
 value = do
-   quotes <- concat <$> many (oneOf (map string ["'", "`", ",@", ","])
-                                 `discard` commit atmosphere)
+   quotes <-
+      concat <$> many
+         (choice [ string "'"
+                 , string "`"
+                 , liftM2 (:) (char ',') (string "@" <|> return "") ]
+             `discard` atmosphere)
 
-   val <- oneOf' [ ("identifier", ident)
-                 , ("list", list)
-                 , ("vector", vector)
-                 , ("bool", bool)
-                 , ("number", number 10)
-                 , ("character", character)
-                 , ("string", quotedString) ]
+   val <- choice [ ident
+                 , list
+                 , vector
+                 , bool
+                 , number 10
+                 , character
+                 , quotedString ]
 
    return $ quote quotes val
  where
@@ -52,65 +52,66 @@ value = do
 
    quoteWith s qs = ScmList . (ScmIdentifier s :) . (:[]) . quote qs
 
-ident :: Parser Char ScmValue
+ident :: Parser ScmValue
 ident = do
-   x <- oneOf [peculiar,ordinary]
-   delimiter
+   -- peculiar needs the try due to negative numbers
+   x <- try $ choice [ peculiar `discard` try delimiter
+                     , ordinary `discard` delimiter ]
    return (ScmIdentifier x)
  where
-   peculiar = oneOf [return <$> pElem "+-", string "..."]
+   peculiar = choice [return <$> oneOf "+-", string "..."]
    ordinary = do
-      x  <- pElem initial
-      xs <- many (pElem (initial ++ "+-.@" ++ ['0'..'9']))
+      x  <- oneOf initial
+      xs <- many (oneOf (initial ++ "+-.@" ++ ['0'..'9']))
       return (x:xs)
     where
       initial = ['a'..'z'] ++ ['A'..'Z'] ++ "!$%&*/:<=>?^_~"
 
-bool :: Parser Char ScmValue
-bool = one '#' >> ScmBool . (== 't') <$> pElem "ft"
+bool :: Parser ScmValue
+bool = ScmBool . (`elem` "tT") <$> try (char '#' >> oneOf "ftFT")
 
-character :: Parser Char ScmValue
+character :: Parser ScmValue
 character = do
-   string "#\\"
-   c <- oneOf [named, ScmChar <$> next]
-   commit delimiter `usingError` "Invalid named character"
-   return c
+   try (string "#\\")
+   c <- try named <|> anyChar
+   delimiter
+   return (ScmChar c)
  where
-   named = oneOf [ string "space"   >> return (ScmChar ' ')
-                 , string "newline" >> return (ScmChar '\n') ]
+   named = choice [ string "space"   >> return ' '
+                  , string "newline" >> return '\n' ]
 
-quotedString :: Parser Char ScmValue
+quotedString :: Parser ScmValue
 quotedString =
-   toScmString <$>
-      (join bracket (one '"') . many $
-         oneOf [ one '\\' >> commit (pElem "\\\"")
-                                `usingError` "Invalid escaped character"
-               , satisfy (/= '"') ])
+   fmap toScmString
+      . between (try $ char '"') (char '"')
+      . many $
+          (char '\\' >> (oneOf "\\\"" <?> concat [show "\\"," or ",show "\""]))
+      <|> satisfy (/= '"')
 
-list :: Parser Char ScmValue
+list :: Parser ScmValue
 list =
-   bracket (one '(') (atmosphere >> one ')') $ do
-      vals <- values `adjustErr` (("In a list:\n"++) . indent 2)
+   between (try $ char '(') (optional atmosphere >> char ')') $ do
+      vals <- values
       if null vals
          then return$ ScmList vals
          else do
-            atmosphere
-            dot <- optional (one '.')
+            optional atmosphere
+            dot <- optionMaybe (char '.')
             if isJust dot
-               then ScmDottedList vals <$> (commit atmosphere >> value)
+               then ScmDottedList vals <$> (atmosphere >> value)
                else return$ ScmList vals
 
-vector :: Parser Char ScmValue
+vector :: Parser ScmValue
 vector = do
-   one '#'
-   toScmVector <$> bracket (one '(') (atmosphere >> one ')') values
+   try (char '#' >> char '(')
+   toScmVector <$> values `discard` (optional atmosphere >> char ')')
 
-number :: Int -> Parser Char ScmValue
+number :: Int -> Parser ScmValue
 number defRadix = do
-   (radix,exact) <- prefix
+   (radix,exact) <- try prefix
 
    let gotPrefix = isJust radix || isJust exact
-   n <- (if gotPrefix then commit else id) $ complex (fromMaybe defRadix radix)
+   n <- (if gotPrefix then id else try) $ complex (fromMaybe defRadix radix)
 
    delimiter
 
@@ -129,37 +130,37 @@ number defRadix = do
                         then return r
                         else radix
     where
-      radix     = f [('b',2), ('o',8), ('d',10), ('x',16)]
-      exactness = f [('e',True), ('i',False)]
-      f xs = optional $ do
-         one '#'
-         fromJust . (`lookup` xs) <$> pElem (map fst xs)
+      radix     = f [('B',2), ('O',8), ('D',10), ('X',16)]
+      exactness = f [('E',True), ('I',False)]
+      f xs = optionMaybe . try $ do
+         char '#'
+         let xs' = map (first toLower) xs ++ xs
+         fromJust . (`lookup` xs') <$> oneOf (map fst xs')
 
    complex radix =
-      oneOf [ do n <- sreal radix
-                 one 'i'
-                 return (mkImaginary n)
+      choice [ try $ do n <- sreal radix
+                        ncChar 'i'
+                        return (mkImaginary n)
 
-            , do a  <- real radix
-                 at <- commit $ optional (one '@')
-                 if isJust at
-                    then mkComplex mkPolar a <$> real radix
-                    else do
-                       b <- optional $
-                               oneOf [ imaginaryUnit
-                                     , do n <- sreal radix
-                                          commit (one 'i')
-                                          return n ]
+             , try $ do a  <- real radix
+                        at <- optionMaybe (char '@')
+                        if isJust at
+                           then mkComplex mkPolar a <$> real radix
+                           else do
+                              b <- optionMaybe $ try imaginaryUnit <|>
+                                      do n <- sreal radix
+                                         ncChar 'i'
+                                         return n
 
-                       return $ case b of
-                                     Nothing -> a
-                                     Just n  -> mkComplex (:+) a n
+                              return $ case b of
+                                            Nothing -> a
+                                            Just n  -> mkComplex (:+) a n
 
-            , mkImaginary <$> imaginaryUnit ]
+             , mkImaginary <$> imaginaryUnit ]
     where
       imaginaryUnit = do
          neg <- sign
-         one 'i'
+         ncChar 'i'
          return (ScmInt neg)
 
       mkImaginary     = mkComplex (:+) (ScmInt 0)
@@ -171,7 +172,7 @@ number defRadix = do
    toDouble _           = error "number.toDouble :: internal error"
 
    real radix = do
-      neg <- optional sign
+      neg <- optionMaybe sign
       applySign (fromMaybe 1 neg) <$> ureal radix
 
    sreal radix = do
@@ -183,54 +184,57 @@ number defRadix = do
    applySign neg (ScmReal n) = ScmReal (fromIntegral neg * n)
    applySign _   _           = error "number.applySign :: іnternal error"
 
-   ureal radix = oneOf [ string "nan.#" >> return (ScmReal $ 0/0)
-                       , string "inf.#" >> return (ScmReal $ 1/0)
-                       , decimal radix
-                       , do a <- uint radix
-                            b <- optional $ one '/' >> uint radix
-                            case b of
-                                 Nothing ->
-                                    if radix == 10
-                                       then tryExponent a
-                                       else return a
-                                 Just n  -> return (mkRatio a n) ]
+   ureal radix = choice [ string "nan.#" >> return (ScmReal $ 0/0)
+                        , string "inf.#" >> return (ScmReal $ 1/0)
+                        , decimal radix
+                        , do a <- uint radix
+                             b <- optionMaybe $ char '/' >> uint radix
+                             case b of
+                                  Nothing ->
+                                     if radix == 10
+                                        then tryExponent a
+                                        else return a
+                                  Just n  -> return (mkRatio a n) ]
 
    mkRatio (ScmInt a) (ScmInt b) = ScmRat (a % b)
    mkRatio _          _          = error "number.mkRatio :: internal error"
 
    decimal radix | radix /= 10 = fail "Decimal outside radix 10"
                  | otherwise   =
-      tryExponent =<< oneOf [ do one '.'
-                                 n <- many1 (digit 10)
-                                 many (one '#')
-                                 return . ScmReal $ readPostDecimal n
+      tryExponent =<<
+         (try . choice) [ do char '.'
+                             n <- many1 (digitN 10)
+                             skipMany (char '#')
+                             return . ScmReal $ readPostDecimal n
 
-                            , do a <- many1 (digit 10)
-                                 one '.'
-                                 b <- many (digit 10)
-                                 many (one '#')
-                                 return . ScmReal $ readDecimal a b
+                        , do a <- many1 (digitN 10)
+                             char '.'
+                             b <- many (digitN 10)
+                             skipMany (char '#')
+                             return . ScmReal $ readDecimal a b
 
-                            , do n <- many1 (digit 10)
-                                 hashes  <- map (const '0') <$> many1 (one '#')
-                                 one '.'
-                                 hashes2 <- many (one '#')
-                                 return . inexactHashes (hashes ++ hashes2) .
-                                    ScmInt $ readInteger 10 (n ++ hashes)
-                            ]
+                        , do n <- many1 (digitN 10)
+                             hashes  <- map (const '0') <$> many1 (char '#')
+                             char '.'
+                             hashes2 <- many (char '#')
+                             return . inexactHashes (hashes ++ hashes2) .
+                                ScmInt $ readInteger 10 (n ++ hashes)
+                        ]
 
    tryExponent n = do
-      ex <- optional $ do pElem "esfdlESFDL" -- Ignore the exponent: all Double
-                          neg <- optional sign
-                          xs  <- many1 (digit 10)
-                          return$ fromMaybe 1 neg * readInteger 10 xs
+      ex <- optionMaybe $ do
+               oneOf "esfdlESFDL" -- Ignore the exponent: all Double
+               neg <- optionMaybe sign
+               xs  <- many1 (digitN 10)
+               return$ fromMaybe 1 neg * readInteger 10 xs
+
       return$ case ex of
                    Nothing -> n
                    Just e  -> ScmReal (10^^e * toDouble n)
 
    uint radix = do
-      n <- many1 (digit radix)
-      hashes <- map (const '0') <$> many (one '#')
+      n <- many1 (digitN radix)
+      hashes <- map (const '0') <$> many (char '#')
       return . inexactHashes hashes . ScmInt $ readInteger radix (n ++ hashes)
 
    -- If any # were present, the value is inexact (R5RS 6.2.4)
@@ -238,14 +242,14 @@ number defRadix = do
    inexactHashes [] = id
    inexactHashes _  = ScmReal . toDouble
 
-   digit :: Int -> Parser Char Char
-   digit 2  = pElem "01"
-   digit 8  = satisfy isOctDigit
-   digit 10 = satisfy isDigit
-   digit 16 = satisfy isHexDigit
-   digit _  = error "number.digit :: internal error"
+   digitN :: Int -> Parser Char
+   digitN 2  = oneOf "01"
+   digitN 8  = octDigit
+   digitN 10 = digit
+   digitN 16 = hexDigit
+   digitN _  = error "number.digitN :: internal error"
 
-   sign = (\c -> if c == '+' then 1 else -1) <$> pElem "+-"
+   sign = (\c -> if c == '+' then 1 else -1) <$> oneOf "+-"
 
    -- These read functions all assume correctly formed input
 
@@ -261,50 +265,23 @@ number defRadix = do
    readDecimal as bs = fromInteger (readInteger 10 as) + readPostDecimal bs
 
 -- Pushes back anything relevant for other parsers
-delimiter :: Parser Char ()
-delimiter = oneOf [whitespaceOrComment, pElem "()\"" >>= reparse.return, eof]
-   `usingError` "Invalid delimiter"
+delimiter :: Parser ()
+delimiter = choice [ whitespaceOrComment
+                   , void . lookAhead . try $ oneOf "()\""
+                   , try eof ]
 
-atmosphere :: Parser Char ()
-atmosphere = void $ many whitespaceOrComment
+atmosphere :: Parser ()
+atmosphere = skipMany whitespaceOrComment
 
-whitespaceOrComment :: Parser Char ()
+whitespaceOrComment :: Parser ()
 whitespaceOrComment =
-   oneOf [ void newline
-         , void (satisfy isSpace)
-         , void comment ]
- where
-   newline = oneOf [ void $ one '\n'
-                   , void $ one '\r' >> optional (one '\n') ]
-   comment = void $ do
-      one ';'
-      commit (many notNewline >> (void newline `onFail` return ()))
+   choice [ void newline
+          , char '\r' >> optional newline
+          , void space
+          , char ';' >> skipMany (noneOf "\n\r") ]
 
-   notNewline = satisfy (`notElem` "\n\r")
+ncChar :: Char -> Parser Char
+ncChar c = satisfy $ (== c) . toLower
 
-one :: Char -> Parser Char Char
-one = satisfyNoCase . (==)
-
-string :: String -> Parser Char String
-string []     = return []
-string (x:xs) = do
-   c <- one x
-   return (c:) `apply` string xs
-
-eof :: Parser t ()
-eof = do
-   x <- optional next
-   case x of
-        Just c  -> reparse [c] >> fail "Expected EOF"
-        Nothing -> return ()
-
-pElem :: [Char] -> Parser Char Char
-pElem = satisfyNoCase . flip elem
-
-satisfyNoCase :: (Char -> Bool) -> Parser Char Char
-satisfyNoCase p = do
-   c <- toLower <$> next
-   if p c then return c else fail "satisfy failed"
-
-usingError :: Parser a b -> String -> Parser a b
-usingError p = adjustErr p . const
+discard :: Parser a -> Parser b -> Parser a
+discard a b = a >>= \a' -> b >> return a'

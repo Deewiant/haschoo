@@ -490,7 +490,7 @@ toNumHelper xs s =
         _              -> tooManyArgs  "string->number"
  where
    f str radix =
-       case Parser.runParser (Parser.number radix) str of
+       case Parser.runParser (Parser.number radix) "" str of
             Right n | isNumeric n -> n
             _                     -> ScmBool False
 

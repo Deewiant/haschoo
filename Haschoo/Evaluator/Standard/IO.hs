@@ -121,7 +121,7 @@ scmRead hdl = go []
          else do
             c <- hGetChar hdl
             let s' = s ++ [c]
-            either (const $ go s') return (runParser value s')
+            either (const $ go s') return (runParser value "" s')
 
 scmReadChar, scmPeekChar, scmCharReady :: Handle -> IO ScmValue
 scmReadChar  = fmap ScmChar . hGetChar
