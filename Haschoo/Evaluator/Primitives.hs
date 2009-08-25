@@ -487,7 +487,7 @@ scmQuasiQuote [] = tooFewArgs  "quasiquote"
 scmQuasiQuote _  = tooManyArgs "quasiquote"
 
 scmDo :: [ScmValue] -> Haschoo ScmValue
-scmDo (ScmList vars@(_:_) : ScmList (test:result) : cmds) = do
+scmDo (ScmList vars : ScmList (test:result) : cmds) = do
    inited <- mapM initVar vars
    c' <- liftIO $ newIORef (mkContext $ map fst inited)
    ctx <- get
@@ -516,7 +516,7 @@ scmDo (ScmList vars@(_:_) : ScmList (test:result) : cmds) = do
    initVar _ = throwError "do :: expected list of variables and initializers"
 
 scmDo (_:_:_:_) = tooManyArgs "do"
-scmDo (_:_:_)   = throwError  "do :: empty lists or nonlists given"
+scmDo (_:_:_)   = throwError  "do :: no tests or nonlist arguments"
 scmDo _         = tooFewArgs  "do"
 
 set :: String -> ScmValue -> Haschoo ()
