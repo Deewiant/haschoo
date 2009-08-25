@@ -177,7 +177,9 @@ scmShow (ScmReal n)
    | isInfinite n = return$ (if n < 0 then '-' else '+') : "inf.#"
    | otherwise    = return$ show n
 scmShow (ScmRat n) =
-   return$ concat [show (numerator n), "/", show (denominator n)]
+   if denominator n == 1
+      then return$ show (numerator n)
+      else return$ concat [show (numerator n), "/", show (denominator n)]
 
 scmShow (ScmComplex (a :+ b)) = do
    bs <- scmShow (ScmReal b)
