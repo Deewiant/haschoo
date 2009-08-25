@@ -14,13 +14,12 @@ module Haschoo.Types
    , toScmString, toScmMString
    , toScmVector
    , pairToList, listToPair
-   , Context(..), mkContext, addToContext, contextLookup, contextSize
+   , Context, mkContext, addToContext, contextLookup, contextSize
    , scmShow, scmShowWith
    ) where
 
 import Control.Applicative        ((<$>))
 import Control.Arrow              (second)
-import Control.Monad              (liftM2)
 import Control.Monad.Error        (ErrorT, MonadError, runErrorT)
 import Control.Monad.State.Strict (StateT, MonadState, evalStateT)
 import Control.Monad.Trans        (MonadIO, liftIO)
@@ -28,19 +27,16 @@ import Data.Array.IO              (IOArray, IOUArray, newListArray, getElems)
 import Data.Array.Unboxed         (Array, UArray, elems, listArray)
 import Data.Complex               (Complex((:+)))
 import Data.IORef                 (IORef, readIORef, newIORef)
-import Data.IntMap                (IntMap)
 import Data.List                  (intercalate)
-import Data.Maybe                 (fromMaybe)
 import Data.Ratio                 (numerator, denominator)
 import System.IO                  (Handle)
 import System.IO.Unsafe           (unsafeInterleaveIO)
 import Text.Show.Functions        ()
 
-import qualified Data.IntMap as IM
 import qualified Data.ListTrie.Patricia.Map.Enum as TM
 import Data.ListTrie.Patricia.Map.Enum (TrieMap)
 
-import Haschoo.Utils (ErrOr, swap, lazyMapM)
+import Haschoo.Utils (ErrOr, lazyMapM)
 
 -- Our main monad
 newtype Haschoo a = Haschoo (StateT HaschState (ErrorT String IO) a)
@@ -154,27 +150,19 @@ toScmMString s = ScmMString <$> newListArray (0, length s - 1) s
 toScmVector :: [ScmValue] -> ScmValue
 toScmVector v = ScmVector $ listArray (0, length v - 1) v
 
-data Context = Context { idMap  :: TrieMap Char Int
-                       , valMap :: IntMap ScmValue }
+newtype Context = Context (TrieMap Char ScmValue)
 
 mkContext :: [(String, ScmValue)] -> Context
-mkContext namedVals = Context ids vals
- where
-   key   = zip [0..]
-   vals  = IM.fromList .            key . map snd $ namedVals
-   ids   = TM.fromList . map swap . key . map fst $ namedVals
+mkContext = Context . TM.fromList
 
 addToContext :: String -> ScmValue -> Context -> Context
-addToContext name val (Context ids vals) =
-   let newId = fromMaybe 0 $ fmap ((+1) . fst . fst) (IM.maxViewWithKey vals)
-    in Context (TM.insert' name newId ids)
-               (IM.insert  newId val vals)
+addToContext name val (Context c) = Context (TM.insert' name val c)
 
-contextLookup :: String -> Context -> Maybe (Context, Int)
-contextLookup s = liftM2 fmap (,) (TM.lookup s . idMap)
+contextLookup :: String -> Context -> Maybe ScmValue
+contextLookup s (Context c) = TM.lookup s c
 
 contextSize :: Context -> Int
-contextSize = IM.size . valMap
+contextSize (Context c) = TM.size' c
 
 scmShow :: ScmValue -> IO String
 scmShow ScmVoid           = return "" -- Has no representation

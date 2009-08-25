@@ -8,7 +8,6 @@ import Control.Monad.State (get)
 import Control.Monad.Trans (liftIO)
 import Data.IORef          (IORef, readIORef, modifyIORef)
 
-import qualified Data.IntMap as IM
 import qualified Data.ListTrie.Patricia.Map.Enum as TM
 import           Data.ListTrie.Patricia.Map.Enum (TrieMap)
 
@@ -17,7 +16,7 @@ import Haschoo.Types           ( Haschoo
                                          , ScmList, ScmDottedList
                                          , ScmVoid, ScmIdentifier)
                                , MacroCall(..)
-                               , Context, valMap, addToContext, contextLookup)
+                               , Context, addToContext, contextLookup)
 import Haschoo.Utils           (lazyMapM, modifyM)
 import Haschoo.Evaluator.Utils (tooFewArgs)
 
@@ -34,11 +33,8 @@ evalWithSpecialCases specials (ScmIdentifier s) =
    lookupId ctx = do
       lookups <- lazyMapM (fmap (contextLookup s) . readIORef) ctx
       case msum lookups of
-           Nothing    -> throwError $ "Unbound identifier '" ++ s ++ "'"
-           Just (c,i) -> case IM.lookup i (valMap c) of
-                              Just v  -> return v
-                              Nothing ->
-                                 throwError $ "Internal error looking up " ++ s
+           Nothing -> throwError $ "Unbound identifier '" ++ s ++ "'"
+           Just v  -> return v
 
 evalWithSpecialCases _  (ScmList [])     = throwError "Empty application"
 evalWithSpecialCases sp (ScmList (x:xs)) = do
