@@ -1,6 +1,6 @@
 -- File created: 2009-07-21 13:19:42
 
-module Haschoo.Driver (main, runOne) where
+module Main (main, runOne) where
 
 import Prelude hiding (catch)
 
