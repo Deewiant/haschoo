@@ -391,17 +391,24 @@ scmMakeComplex _ s (_:_:_) = tooManyArgs s
 scmMakeComplex _ s _       = tooFewArgs  s
 
 scmRealPart, scmImagPart, scmNorm, scmAngle :: [ScmValue] -> ErrOr ScmValue
-scmRealPart = scmComplexPart realPart  id        "real-part"
-scmImagPart = scmComplexPart imagPart  (const 0) "imag-part"
-scmNorm     = scmComplexPart magnitude id        "magnitude"
-scmAngle    = scmComplexPart phase     (const 0) "angle"
+scmRealPart = scmComplexPart realPart  Right                  "real-part"
+scmImagPart = scmComplexPart imagPart  (liftScmNum $ const 0) "imag-part"
+scmNorm     = scmComplexPart magnitude (liftScmNum abs)       "magnitude"
+scmAngle    = scmComplexPart phase     (Right . angle)        "angle"
+ where
+   angle (ScmReal n) = f ScmReal n
+   angle (ScmRat  n) = f ScmRat  n
+   angle (ScmInt  n) = f ScmInt  n
+   angle _           = error "angle :: the impossible happened"
+
+   f c n = if n >= 0 then c n else ScmReal (-pi/2)
 
 scmComplexPart :: (Complex Double -> Double)
-               -> (forall n. Num n => n -> n)
+               -> (ScmValue -> ErrOr ScmValue)
                -> String
                -> [ScmValue] -> ErrOr ScmValue
 scmComplexPart f _ _ [ScmComplex x]    = Right $ ScmReal (f x)
-scmComplexPart _ g _ [x] | isNumeric x = liftScmNum g x
+scmComplexPart _ g _ [x] | isNumeric x = g x
 scmComplexPart _ _ s [_]               = notNum s
 scmComplexPart _ _ s []                = tooFewArgs s
 scmComplexPart _ _ s _                 = tooManyArgs s
