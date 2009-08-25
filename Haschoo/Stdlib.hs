@@ -8,6 +8,8 @@ import Control.Exception (catch, SomeException)
 import Data.IORef        (IORef, newIORef, readIORef)
 import System.Exit       (exitFailure)
 
+import Paths_Haschoo (getDataFileName) -- Thanks to Cabal
+
 import Haschoo.Running         (runFile)
 import Haschoo.Types           (Context, addToContext, ScmValue(..))
 import Haschoo.Utils           (errPut, errPutLn, errPrint, ErrOr)
@@ -19,11 +21,12 @@ import qualified Haschoo.Evaluator.Primitives as Primitives
 toplevelContext, primitiveContext :: IO [IORef Context]
 toplevelContext = do
    pc <- primitiveContext
-   load pc std "std-func.scm"
+   load pc std =<< getDataFileName "std-func.scm"
  where
    std = foldr (uncurry addToContext) Standard.context envFuncs
 
-primitiveContext = load [] Primitives.context "std-prim.scm"
+primitiveContext =
+	load [] Primitives.context =<< getDataFileName "std-prim.scm"
 
 load :: [IORef Context] -> Context -> FilePath -> IO [IORef Context]
 load ctx new path = (do

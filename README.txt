@@ -45,10 +45,6 @@ runhaskell Setup.hs configure
 runhaskell Setup.hs build
 runhaskell Setup.hs install
 
-As a last resort:
-
-ghc --make Haschoo/Main.hs -o haschoo -O2
-
 Goal
 ----
 
