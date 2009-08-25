@@ -317,9 +317,10 @@ scmLookup p s [obj, list] =
 
    go _ = return$ notList s
 
-   match (ScmPair a _)   = p obj =<< readIORef a
-   match (ScmList (a:_)) = p obj a
-   match _               = return False
+   match (ScmPair a _)           = p obj =<< readIORef a
+   match (ScmDottedList (a:_) _) = p obj a
+   match (ScmList (a:_))         = p obj a
+   match _                       = return False
 
 scmLookup _ s (_:_:_) = return$ tooManyArgs s
 scmLookup _ s _       = return$ tooFewArgs  s
