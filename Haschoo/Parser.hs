@@ -207,7 +207,7 @@ number defRadix = do
                                    case b of
                                         Nothing ->
                                            if radix == 10
-                                              then tryExponent a
+                                              then tryExponent exact a
                                               else return a
                                         Just n  -> return (mkRatio a n) ]
 
@@ -216,7 +216,7 @@ number defRadix = do
 
    decimal exact radix | radix /= 10 = fail "Decimal outside radix 10"
                        | otherwise   =
-      tryExponent =<<
+      tryExponent exact =<<
          (try . choice) [ do char '.'
                              n <- many1 (digitN 10)
                              skipMany (char '#')
@@ -239,16 +239,24 @@ number defRadix = do
                                 ScmInt $ readInteger 10 (n ++ hashes)
                         ]
 
-   tryExponent n = do
+   tryExponent exact n = do
       ex <- optionMaybe $ do
                oneOf "esfdlESFDL" -- Ignore the exponent: all Double
                neg <- optionMaybe sign
                xs  <- many1 (digitN 10)
                return$ fromMaybe 1 neg * readInteger 10 xs
 
-      return$ case ex of
-                   Nothing -> n
-                   Just e  -> ScmReal (10^^e * toDouble n)
+      return$
+         case ex of
+              Nothing -> n
+              Just e | not exact -> ScmReal (10^^e * toDouble n)
+                     | otherwise ->
+                        case n of
+                             ScmInt x -> ScmRat (10^^e * fromInteger x)
+                             ScmRat x -> ScmRat (10^^e * x)
+                             _        ->
+                                error$ "Parser.tryExponent :: "
+                                    ++ "the impossible happened"
 
    uint radix = do
       n <- many1 (digitN radix)
