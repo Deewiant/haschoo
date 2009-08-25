@@ -448,6 +448,7 @@ scmToExact _                  = tooManyArgs "exact->inexact"
 
 scmToString, scmToNumber :: [ScmValue] -> IO (ErrOr ScmValue)
 
+-- TODO: scmShow should use this or vice versa
 scmToString (x:xs) | isNumeric x =
    case xs of
         []             -> g x 10
@@ -466,21 +467,34 @@ scmToString (x:xs) | isNumeric x =
 
    f (ScmInt i) radix = Right $ showInt radix i
    f (ScmRat r) radix = Right $
-      concat [showInt radix (numerator r), "/", showInt radix (denominator r)]
+      if denominator r == 1
+         then showInt radix (numerator r)
+         else concat [ showInt radix (numerator r)
+                     , "/"
+                     , showInt radix (denominator r) ]
 
    f (ScmReal r) radix =
       if radix == 10
-         then
-            -- R5RS 6.2.6 specifies that "the result contains a decimal point"
-            -- if inexact and a decimal-point containing result can make it
-            -- work
-            Right (show r)
+         then Right $
+                 case () of
+                      _| isNaN      r -> "+nan.#"
+                       | isInfinite r -> (if r < 0 then '-' else '+') : "inf.#"
+
+                       -- R5RS 6.2.6 specifies that "the result contains a
+                       -- decimal point" if inexact and a decimal-point
+                       -- containing result can make it work
+                       | otherwise    -> show r
          else fail "number->string :: nondecimal radix for inexact real"
 
-   f (ScmComplex r) radix =
+   f (ScmComplex (a :+ b)) radix =
       -- As in the ScmReal case
       if radix == 10
-         then Right (show r)
+         then Right . concat $ let bs = either undefined id $ f (ScmReal b) 10
+                                in [ either undefined id $ f (ScmReal a) 10
+                                   , if head bs `elem` "-+" then [] else "+"
+                                   , bs
+                                   , "i" ]
+
          else fail "number->string :: nondecimal radix for inexact complex"
 
    f _ _ = error "number->string :: the impossible happened"
