@@ -104,7 +104,12 @@ list =
             optional atmosphere
             dot <- optionMaybe (char '.')
             if isJust dot
-               then ScmDottedList vals <$> (atmosphere >> value)
+               then do
+                  atmosphere
+                  end <- value
+                  return$ case end of
+                               ScmList l -> ScmList (vals ++ l)
+                               _         -> ScmDottedList vals end
                else return$ ScmList vals
 
 vector :: Parser ScmValue
