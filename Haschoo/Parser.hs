@@ -63,7 +63,7 @@ ident = do
    -- peculiar needs the try due to negative numbers
    x <- try $ choice [ peculiar `discard` try delimiter
                      , ordinary `discard` delimiter ]
-   return (ScmIdentifier x)
+   return (ScmIdentifier $ map toLower x)
  where
    peculiar = choice [return <$> oneOf "+-", string "..."]
    ordinary = do
@@ -296,7 +296,7 @@ whitespaceOrComment =
           , char ';' >> skipMany (noneOf "\n\r") ]
 
 ncChar :: Char -> Parser Char
-ncChar c = satisfy $ (== c) . toLower
+ncChar c = toLower <$> satisfy ((== c) . toLower)
 
 discard :: Parser a -> Parser b -> Parser a
 discard a b = a >>= \a' -> b >> return a'
