@@ -1,7 +1,7 @@
 Cabal-Version: >= 1.6
 
 Name:        Haschoo
-Version:     0.1
+Version:     0.1.1
 Homepage:    http://iki.fi/matti.niemenmaa/misc-projects.html#haschoo
 Synopsis:    Minimalist R5RS Scheme interpreter
 Category:    Compilers/Interpreters
@@ -30,9 +30,9 @@ Executable haschoo
    Main-Is: Haschoo/Main.hs
 
    Build-Depends: base        == 4.*
-                , array       == 0.2.*
-                , mtl         == 1.1.*
-                , list-tries  == 0.1.*
+                , array       >= 0.2 && < 0.4
+                , mtl         >= 1.1 && < 2.1
+                , list-tries  >= 0.1 && < 0.5
                 , numbers     >= 2009.5.28 && <= 2009.8.9
                 , monad-loops == 0.3.*
                 , parsec      == 2.1.*
