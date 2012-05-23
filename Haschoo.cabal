@@ -33,7 +33,7 @@ Executable haschoo
                 , array       >= 0.2 && < 0.4
                 , mtl         >= 1.1 && < 2.1
                 , list-tries  >= 0.1 && < 0.5
-                , numbers     >= 2009.5.28 && <= 2009.8.9
+                , numbers     >= 2009.5.28 && < 3000.1
                 , monad-loops == 0.3.*
                 , parsec      == 2.1.*
 
