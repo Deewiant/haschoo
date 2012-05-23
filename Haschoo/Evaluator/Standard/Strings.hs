@@ -11,8 +11,9 @@ import Data.Array.IO       (IOUArray)
 import Data.Array.MArray   ( readArray, writeArray
                            , newArray, newListArray
                            , getBounds, getElems
-                           , freeze, thaw, unsafeFreeze, unsafeThaw)
+                           , freeze, thaw)
 import Data.Array.Unboxed  (UArray)
+import Data.Array.Unsafe   (unsafeFreeze, unsafeThaw)
 import Data.Char           (isLetter, toLower)
 import Data.Foldable       (foldrM)
 import Data.Function       (on)
