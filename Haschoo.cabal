@@ -30,7 +30,7 @@ Executable haschoo
    Main-Is: Haschoo/Main.hs
 
    Build-Depends: base        == 4.*
-                , array       >= 0.2 && < 0.5
+                , array       >= 0.4 && < 0.5
                 , mtl         >= 1.1 && < 2.2
                 , list-tries  >= 0.1 && < 0.5
                 , numbers     >= 2009.5.28 && < 3000.1
